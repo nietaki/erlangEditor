@@ -15,14 +15,21 @@
 
 
 start() -> 
-    application:start(cecho),
+    application:ensure_all_started(erlangEditor),
     application:start(erlangEditor).
 
 cecho_test() ->
     ok = cecho:cbreak(),
     ok = cecho:noecho(),
-    ok = cecho:curs_set(?ceCURS_INVISIBLE),
+    ok = cecho:curs_set(?ceCURS_NORMAL),
     %% Write initial string...
+    cecho_loop(0, 0).
+
+cecho_loop(Y, X) ->
+    {MaxY, MaxX} = cecho:getmaxyx(),
     ok = cecho:mvaddstr(0, 0, "Hello World!"),
+    ok = cecho:move(Y, X),
+    %{CurY, CurX} = cecho:getyx(),
     ok = cecho:refresh(),
-    cecho_test().
+    timer:sleep(200),
+    cecho_loop((Y + 1) rem MaxY, (X + 1) rem MaxX). 
