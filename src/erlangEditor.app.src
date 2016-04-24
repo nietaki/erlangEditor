@@ -1,0 +1,13 @@
+{application, erlangEditor,
+ [
+  {description, "A wannabe collaborative Editor app - work in progress"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  cecho
+                 ]},
+  {mod, { erlangEditor_app, []}},
+  {env, []}
+ ]}.
