@@ -21,6 +21,7 @@ start() ->
 cecho_test() ->
     ok = cecho:cbreak(),
     ok = cecho:noecho(),
+    ok = cecho:keypad(?ceSTDSCR, true),
     ok = cecho:curs_set(?ceCURS_NORMAL),
     %% Write initial string...
     cecho_loop(0, 0).
@@ -31,5 +32,16 @@ cecho_loop(Y, X) ->
     ok = cecho:move(Y, X),
     %{CurY, CurX} = cecho:getyx(),
     ok = cecho:refresh(),
-    timer:sleep(200),
-    cecho_loop((Y + 1) rem MaxY, (X + 1) rem MaxX). 
+    Ch = cecho:getch(),
+    {YDiff, XDiff} = get_offset(Ch),
+    cecho:mvaddch(10, 10, Ch),
+    cecho_loop((Y + YDiff + MaxY) rem MaxY, (X + XDiff + MaxX) rem MaxX). 
+
+get_offset(Ch) ->
+    case Ch of
+        ?ceKEY_DOWN -> {1, 0};
+        ?ceKEY_UP -> {-1, 0};
+        ?ceKEY_LEFT -> {0, -1};
+        ?ceKEY_RIGHT -> {0, 1};
+        _ -> {0, 0}
+    end.
