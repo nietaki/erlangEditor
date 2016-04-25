@@ -23,7 +23,8 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    Editor = {erlangEditor, {erlangEditor, cecho_test, []}, permanent, 20, worker, [erlangEditor]},
-    Children = [Editor],
+    %Editor = {erlangEditor, {erlangEditor, cecho_test, []}, permanent, 20, worker, [erlangEditor]},
+    Display = {cursesDisplay, {cursesDisplay, start_link, []}, permanent, 20, worker, [erlangEditor]},
+    Children = [Display],
     {ok, { {one_for_one, 5, 10}, Children}}.
 

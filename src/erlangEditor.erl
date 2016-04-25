@@ -10,14 +10,18 @@
 -author("nietaki").
 
 %% API
--export([start/0, cecho_test/0]).
+%-export([start/0, cecho_test/0]).
+-export([start/0]).
+
 -include("../deps/cecho/include/cecho.hrl").
+
 
 
 start() -> 
     application:ensure_all_started(erlangEditor),
     application:start(erlangEditor).
 
+%% NOTE, ANYTHING BELOW ISN'T USED ANYMORE, JUST KEPT HERE FOR REFERENCE %%
 cecho_test() ->
     ok = cecho:cbreak(),
     ok = cecho:noecho(),
