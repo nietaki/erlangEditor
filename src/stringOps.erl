@@ -34,7 +34,6 @@ delete_character_test_() ->
 insert_char(String, Character, Position) ->
     lists:reverse(insert_char_1(String, Character, Position, "")).
 
-%insert_char_1(String, Character, Position, Acc) 
 insert_char_1([], Ch, 0, Acc) -> [Ch|Acc];
 insert_char_1([], _, _, Acc) -> Acc;
 insert_char_1([H|T], Ch, 0, Acc) -> insert_char_1(T, Ch, -1, [H|[Ch|Acc]]);

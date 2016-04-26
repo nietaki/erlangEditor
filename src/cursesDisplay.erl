@@ -203,19 +203,14 @@ handle_char(State, Ch) ->
 fixup_state_position(#state{text = Text, cursorPosition = Position}) ->
     #state{text = Text, cursorPosition = min(Position, string:len(Text))}.
 
-map_key_to_direction(DirectionChar) ->
-    case DirectionChar of
-        ?ceKEY_DOWN -> down;
-        ?ceKEY_UP -> up;
-        ?ceKEY_LEFT -> left;
-        ?ceKEY_RIGHT -> right;
-        _ -> none
-    end.
-
-insert_character(State, Character, Position) -> State.
+insert_character(State, _Character, _Position) -> State.
     
 delete_character(#state{text = Text, cursorPosition = CurrentPosition}, PositionToDelete) ->
-    #state{text = stringOps:delete_char(Text, PositionToDelete), cursorPosition = PositionToDelete}.
+    NewCursorPosition = if
+        PositionToDelete < CurrentPosition -> CurrentPosition - 1;
+        true -> CurrentPosition
+    end, 
+    #state{text = stringOps:delete_char(Text, PositionToDelete), cursorPosition = NewCursorPosition}.
 
 get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     NewPosition = case Direction of
@@ -227,7 +222,7 @@ get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     end,
     min(max(0, NewPosition), ConsoleHeight * ConsoleWidth - 1).
 
-get_yx_from_position({ConsoleHeight, ConsoleWidth}, Position) ->
+get_yx_from_position({_ConsoleHeight, ConsoleWidth}, Position) ->
     {Position div ConsoleWidth, Position rem ConsoleWidth}.
     
 
