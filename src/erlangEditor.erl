@@ -10,10 +10,16 @@
 -author("nietaki").
 
 %% API
--export([start/0]).
+-export([start/0, stop/0]).
 
 -include("../deps/cecho/include/cecho.hrl").
 
 start() -> 
     application:ensure_all_started(erlangEditor),
     application:start(erlangEditor).
+
+stop() ->
+    application:stop(cecho),
+    application:stop(erlangEditor),
+    init:stop(),
+    erlang:halt(). % ok, I don't really know how to exit an Erlang app elegantly right now

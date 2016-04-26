@@ -34,6 +34,9 @@
     cursorPosition
 }).
 
+-define(ceKEY_BACKSPACE, 127).
+-define(ceKEY_BACKSPACE2, 8).
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -109,6 +112,9 @@ handle_call(_Request, _From, State) ->
     {noreply, NewState :: #state{}} |
     {noreply, NewState :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #state{}}).
+handle_cast({ch, ?ceKEY_ESC}, State) -> 
+    erlangEditor:stop(),
+    {stop, user_pressed_esc, State};
 handle_cast({ch, Ch}, State) ->
     cecho:mvaddch(10, 10, Ch),
     NewState = handle_char(State, Ch),
@@ -196,15 +202,22 @@ handle_char(State, Ch) ->
         ?ceKEY_UP -> State#state{cursorPosition = get_new_position(CursorPosition, YX, up)};
         ?ceKEY_LEFT -> State#state{cursorPosition = get_new_position(CursorPosition, YX, left)};
         ?ceKEY_RIGHT -> State#state{cursorPosition = get_new_position(CursorPosition, YX, right)};
-        _ -> State
+        ?ceKEY_BACKSPACE -> delete_character(State, CursorPosition - 1);
+        ?ceKEY_BACKSPACE2-> delete_character(State, CursorPosition - 1);
+        SomethingElse -> error(SomethingElse) 
     end,
     fixup_state_position(NewState).
   
 fixup_state_position(#state{text = Text, cursorPosition = Position}) ->
-    #state{text = Text, cursorPosition = min(Position, string:len(Text))}.
+    #state{text = Text, cursorPosition = max(min(Position, string:len(Text)), 0)}.
 
-insert_character(State, _Character, _Position) -> State.
-    
+insert_character(#state{text = Text, cursorPosition = CurrentPosition}, Character, Position) -> 
+    NewCursorPosition = if
+        Position =< CurrentPosition-> CurrentPosition + 1;
+        true -> CurrentPosition
+    end,
+    #state{text = stringOps:insert_char(Text, Character, Position), cursorPosition = NewCursorPosition}.
+
 delete_character(#state{text = Text, cursorPosition = CurrentPosition}, PositionToDelete) ->
     NewCursorPosition = if
         PositionToDelete < CurrentPosition -> CurrentPosition - 1;
