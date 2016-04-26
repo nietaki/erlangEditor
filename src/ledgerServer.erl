@@ -102,7 +102,7 @@ handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}, State) ->
     #state{head_id = StateHeadId} = State,
     case BaseHeadId of
         StateHeadId -> 
-            case lists:all(fun(X) -> is_a_change(X) end, NewChanges) of
+            case lists:all(fun is_a_change/1, NewChanges) of
                 false -> {noreply, State}; %changes were broken
                 true ->
                     case apply_changes(State#state.head_text, NewChanges) of
