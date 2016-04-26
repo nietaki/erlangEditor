@@ -177,6 +177,7 @@ getch_loop(ServerRef) ->
 -spec(repaint(State :: #state{}) -> ok).
 repaint(State) -> 
     #state{text = Text, cursorPosition = Pos} = State,
+    ok = cecho:erase(),
     ok = cecho:mvaddstr(0, 0, Text),
     {Y, X} = get_yx_from_position(cecho:getmaxyx(), Pos),
     ok = cecho:move(Y, X),
@@ -184,13 +185,23 @@ repaint(State) ->
     ok.
 
 -spec(handle_char(State :: #state{}, Ch ::char()) -> #state{}).
-handle_char(#state{text=Text, cursorPosition = Position}, Ch) ->
+handle_char(State, Ch) ->
     YX = cecho:getmaxyx(),
-    Direction = map_key_to_direction(Ch),
-    NewPosition = get_new_position(Position, YX, Direction),
-    #state{text=Text, cursorPosition = NewPosition}.
-    
-   
+    CursorPosition = State#state.cursorPosition,
+    NewState = case Ch of
+        Printable when Printable >= 20, Printable =< $~ -> insert_character(State, Printable, CursorPosition);
+        ?ceKEY_DEL -> delete_character(State, CursorPosition);
+        ?ceKEY_DOWN -> State#state{cursorPosition = get_new_position(CursorPosition, YX, down)};
+        ?ceKEY_UP -> State#state{cursorPosition = get_new_position(CursorPosition, YX, up)};
+        ?ceKEY_LEFT -> State#state{cursorPosition = get_new_position(CursorPosition, YX, left)};
+        ?ceKEY_RIGHT -> State#state{cursorPosition = get_new_position(CursorPosition, YX, right)};
+        _ -> State
+    end,
+    fixup_state_position(NewState).
+  
+fixup_state_position(#state{text = Text, cursorPosition = Position}) ->
+    #state{text = Text, cursorPosition = min(Position, string:len(Text))}.
+
 map_key_to_direction(DirectionChar) ->
     case DirectionChar of
         ?ceKEY_DOWN -> down;
@@ -200,13 +211,28 @@ map_key_to_direction(DirectionChar) ->
         _ -> none
     end.
 
+insert_character(State, Character, Position) -> State.
+    
+insert_character_into_string(String, Character, Position) ->
+    notok.
+
+delete_character(#state{text = Text, cursorPosition = CurrentPosition}, PositionToDelete) ->
+    #state{text = delete_character_from_string(Text, PositionToDelete), cursorPosition = PositionToDelete}.
+
+delete_character_from_string(String, Position) ->
+    lists:reverse(delete_character_1(String, Position, [])).
+
+delete_character_1([], _, Acc) -> Acc;
+delete_character_1([H|T], 0, Acc) -> delete_character_1(T, -1, Acc);
+delete_character_1([H|T], X, Acc) -> delete_character_1(T, X-1, [H|Acc]).
+
 get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     NewPosition = case Direction of
         down -> OriginalPosition + ConsoleWidth;
         up -> OriginalPosition - ConsoleWidth;
         left -> OriginalPosition - 1;
-        right -> OriginalPosition + 1;
-        _ -> OriginalPosition 
+        right -> OriginalPosition + 1
+        %_ -> OriginalPosition 
     end,
     min(max(0, NewPosition), ConsoleHeight * ConsoleWidth - 1).
 
