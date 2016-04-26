@@ -11,6 +11,7 @@
 
 -behaviour(gen_server).
 -include("../deps/cecho/include/cecho.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 %% API
 -export([start_link/0]).
@@ -213,18 +214,8 @@ map_key_to_direction(DirectionChar) ->
 
 insert_character(State, Character, Position) -> State.
     
-insert_character_into_string(String, Character, Position) ->
-    notok.
-
 delete_character(#state{text = Text, cursorPosition = CurrentPosition}, PositionToDelete) ->
-    #state{text = delete_character_from_string(Text, PositionToDelete), cursorPosition = PositionToDelete}.
-
-delete_character_from_string(String, Position) ->
-    lists:reverse(delete_character_1(String, Position, [])).
-
-delete_character_1([], _, Acc) -> Acc;
-delete_character_1([H|T], 0, Acc) -> delete_character_1(T, -1, Acc);
-delete_character_1([H|T], X, Acc) -> delete_character_1(T, X-1, [H|Acc]).
+    #state{text = stringOps:delete_char(Text, PositionToDelete), cursorPosition = PositionToDelete}.
 
 get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     NewPosition = case Direction of
