@@ -186,10 +186,34 @@ repaint(State) ->
     #state{text = Text, cursorPosition = Pos} = State,
     ok = cecho:erase(),
     ok = cecho:mvaddstr(0, 0, Text),
+    {_Height, Width} = cecho:getmaxyx(),
+    ok = render_lines(0, split_into_lines(Width, Text)),
     {Y, X} = get_yx_from_position(cecho:getmaxyx(), Pos),
     ok = cecho:move(Y, X),
     ok = cecho:refresh(),
     ok.
+
+render_lines(_StartingLineNumber, []) -> ok;
+render_lines(StartingLineNumber, [H|T]) ->
+    cecho:mvaddstr(StartingLineNumber, 0, H),
+    render_lines(StartingLineNumber + 1, T).
+    
+
+-spec(split_into_lines(LineLength :: integer(), Text :: list()) -> [list()]).
+split_into_lines(LineLength, Text) ->
+    lists:reverse(split_into_lines_1(LineLength, Text, [])).
+
+split_into_lines_1(_LineLength, [], Acc) -> Acc;
+split_into_lines_1(LineLength, Text, Acc) ->
+    {First, Rest} = stringOps:split(LineLength, Text),
+    split_into_lines_1(LineLength, Rest, [First|Acc]).
+
+
+split_into_lines_test_() -> [
+    ?_assertEqual([], split_into_lines(10, "")),
+    ?_assertEqual(["a", "b"], split_into_lines(1, "ab")),
+    ?_assertEqual(["ab", "c"], split_into_lines(2, "abc"))
+].
 
 -spec(handle_char(State :: #state{}, Ch ::char()) -> #state{}).
 handle_char(State, Ch) ->
@@ -204,7 +228,8 @@ handle_char(State, Ch) ->
         ?ceKEY_RIGHT -> State#state{cursorPosition = get_new_position(CursorPosition, YX, right)};
         ?ceKEY_BACKSPACE -> delete_character(State, CursorPosition - 1);
         ?ceKEY_BACKSPACE2-> delete_character(State, CursorPosition - 1);
-        SomethingElse -> error(SomethingElse) 
+        _ -> State           
+        %SomethingElse -> error(SomethingElse) 
     end,
     fixup_state_position(NewState).
   

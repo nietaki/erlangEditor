@@ -11,7 +11,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 %% API
--export([insert_char/3, delete_char/2]).
+-export([insert_char/3, delete_char/2, split/2]).
 
 delete_char(String, Position) ->
     lists:reverse(delete_character_1(String, Position, [])).
@@ -49,3 +49,22 @@ insert_char_test_() ->
         ?_assertEqual("a", insert_char("a", $x, 2)),
         ?_assertEqual("axc", insert_char("ac", $x, 1))
     ].
+
+% robust version of lists:split
+-spec(split(N :: integer(), List1:: [any()]) -> {[any()], [any()]}).
+split(N, _List1) when N < 1 -> error("cannot split into bits smaller than 1");
+split(N, List1) ->
+    {First, Second} = split_1(N, [], List1),
+    {lists:reverse(First), Second}.
+
+split_1(0, Acc, Remaining) -> {Acc, Remaining};
+split_1(_N, Acc, []) -> {Acc, []};
+split_1(N, Acc, [H|T]) -> split_1(N - 1, [H|Acc], T).
+
+split_test_() -> [
+    ?_assertEqual({"", ""}, split(1, "")),
+    ?_assertEqual({"", ""}, split(5, "")),
+    ?_assertEqual({"ab", "cde"}, split(2, "abcde")),
+    ?_assertEqual({"abcde", ""}, split(5, "abcde")),
+    ?_assertEqual({"abcde", ""}, split(665, "abcde"))
+].
