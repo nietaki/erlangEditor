@@ -12,7 +12,10 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0, register/0, submit_local_changes/3]).
+
+%% debug API
+-export([debug_get_state/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -87,6 +90,12 @@ handle_call(get_state, _From, State) ->
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
+register() ->
+    gen_server:call(?MODULE, register).
+
+debug_get_state() ->
+    gen_server:call(?MODULE, get_state).
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -123,6 +132,9 @@ handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}, State) ->
     end;
 handle_cast(_Request, State) ->
     {noreply, State}.
+
+submit_local_changes(Pid, BaseHeadId, NewChanges) ->
+    gen_server:cast(?MODULE, {submit_local_changes, Pid, BaseHeadId, NewChanges}).
 
 %%--------------------------------------------------------------------
 %% @private

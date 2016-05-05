@@ -24,25 +24,31 @@ server_is_alive(Pid) ->
         ?assertEqual(true, is_process_alive(Pid))
     end.
 
-server_registers_a_client(Pid) ->
+server_registers_a_client(_Pid) ->
     fun() ->
-        gen_server:call(Pid, register),
-        {state, 0, [], _ClientPids, []} = gen_server:call(Pid, get_state)
+        %%% previous, non-api way of doing this, for reference
+        %gen_server:call(Pid, register),
+        %{state, 0, [], _ClientPids, []} = gen_server:call(Pid, get_state)
+        
+        ledgerServer:register(),
+        {state, 0, [], ClientPids, []} = ledgerServer:debug_get_state(),
+        ?assert(maps:is_key(self(), ClientPids)),
+        ?assertEqual(0, maps:get(self(), ClientPids))
     end.
 
-server_registers_a_client_andGetsChangesSubmitted(Pid) ->
+server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
     fun() ->
-        gen_server:call(Pid, register),
-        gen_server:cast(Pid, {submit_local_changes, self(), 0, [{insert_char, 0, $x}]}),
-        {state, 1, "x", _ClientPids, [{insert_char, 0, $x}]} = gen_server:call(Pid, get_state),
+        ledgerServer:register(),
+        ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
+        {state, 1, "x", _ClientPids, [{insert_char, 0, $x}]} = ledgerServer:debug_get_state(),
         expect_cast({local_changes_accepted,0,1}) 
     end.
 
-server_registers_a_client_andGetsTwoChangesSubmitted(Pid) ->
+server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
     fun() ->
-        gen_server:call(Pid, register),
-        gen_server:cast(Pid, {submit_local_changes, self(), 0, [{insert_char, 0, $x}, {insert_char, 1, $y}]}),
-        {state, 2, "xy", _ClientPids, [{insert_char, 0, $x}, {insert_char, 1, $y}]} = gen_server:call(Pid, get_state),
+        ledgerServer:register(),
+        ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}, {insert_char, 1, $y}]),
+        {state, 2, "xy", _ClientPids, [{insert_char, 0, $x}, {insert_char, 1, $y}]} = ledgerServer:debug_get_state(),
         expect_cast({local_changes_accepted,0,2}) 
     end.
 
@@ -64,5 +70,6 @@ setup() ->
 
 cleanup(Pid) ->
     ?debugMsg("cleanup"),
+    lib:flush_receive(),
     exit(Pid, kill), %% brutal kill!
     ?assertEqual(false, is_process_alive(Pid)).
