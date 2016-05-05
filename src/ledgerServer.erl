@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, register/0, submit_local_changes/3]).
+-export([start_link/0, register/1, submit_local_changes/3]).
 
 %% debug API
 -export([debug_get_state/0]).
@@ -26,9 +26,7 @@
     code_change/3]).
 
 -define(SERVER, ?MODULE).
-
-% clients is a map of Pid/contact name, to last seen head_id
--record(state, {head_id = 0, head_text = "", clients = #{}, changes = []}).
+-include_lib("ledgerServer.hrl").
 
 %%%===================================================================
 %%% API
@@ -61,10 +59,10 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(init(Args :: term()) ->
-    {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
+    {ok, State :: #ledger_state{}} | {ok, State :: #ledger_state{}, timeout() | hibernate} |
     {stop, Reason :: term()} | ignore).
 init([]) ->
-    {ok, #state{}}.
+    {ok, #ledger_state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -74,24 +72,25 @@ init([]) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-        State :: #state{}) ->
-    {reply, Reply :: term(), NewState :: #state{}} |
-    {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-    {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(register, From, State) ->
-    #state{head_id = HeadId, clients = Clients} = State,
-    NewClients = Clients#{get_client_pid(From) => HeadId},
-    {reply, get_ledger_state_message(State), State#state{clients = NewClients}};
+        State :: #ledger_state{}) ->
+    {reply, Reply :: term(), NewState :: #ledger_state{}} |
+    {reply, Reply :: term(), NewState :: #ledger_state{}, timeout() | hibernate} |
+    {noreply, NewState :: #ledger_state{}} |
+    {noreply, NewState :: #ledger_state{}, timeout() | hibernate} |
+    {stop, Reason :: term(), Reply :: term(), NewState :: #ledger_state{}} |
+    {stop, Reason :: term(), NewState :: #ledger_state{}}).
+handle_call({register, Username}, From, State) ->
+    #ledger_state{head_id = HeadId, clients = Clients} = State,
+    NewClientState = #client_info{username = Username, last_seen_head = HeadId},
+    NewClients = Clients#{get_client_pid(From) => NewClientState},
+    {reply, get_ledger_state_message(State), State#ledger_state{clients = NewClients}};
 handle_call(get_state, _From, State) ->
     {reply, State, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
-register() ->
-    gen_server:call(?MODULE, register).
+register(Username) ->
+    gen_server:call(?MODULE, {register, Username}).
 
 debug_get_state() ->
     gen_server:call(?MODULE, get_state).
@@ -103,26 +102,26 @@ debug_get_state() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_cast(Request :: term(), State :: #state{}) ->
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term(), NewState :: #state{}}).
+-spec(handle_cast(Request :: term(), State :: #ledger_state{}) ->
+    {noreply, NewState :: #ledger_state{}} |
+    {noreply, NewState :: #ledger_state{}, timeout() | hibernate} |
+    {stop, Reason :: term(), NewState :: #ledger_state{}}).
 handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}, State) ->
-    #state{head_id = StateHeadId} = State,
+    #ledger_state{head_id = StateHeadId} = State,
     case BaseHeadId of
         StateHeadId -> 
             case lists:all(fun is_a_change/1, NewChanges) of
                 false -> {noreply, State}; %changes were broken
                 true ->
-                    case apply_changes(State#state.head_text, NewChanges) of
+                    case apply_changes(State#ledger_state.head_text, NewChanges) of
                         {ok, NewText} -> 
-                            OldId = State#state.head_id,
+                            OldId = State#ledger_state.head_id,
                             NewId = OldId + length(NewChanges),
-                            OldChanges = State#state.changes,
-                            ClientsMap = State#state.clients,
+                            OldChanges = State#ledger_state.changes,
+                            ClientsMap = State#ledger_state.clients,
                             NewClientsMap = ClientsMap#{Pid := NewId},
                             gen_server:cast(Pid, {local_changes_accepted, OldId, length(NewChanges)}),
-                            {noreply, State#state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges}};
+                            {noreply, State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges}};
                         _ -> 
                             {noreply, State} %changes couldn't be applied
                     end
@@ -146,10 +145,10 @@ submit_local_changes(Pid, BaseHeadId, NewChanges) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-    {noreply, NewState :: #state{}} |
-    {noreply, NewState :: #state{}, timeout() | hibernate} |
-    {stop, Reason :: term(), NewState :: #state{}}).
+-spec(handle_info(Info :: timeout() | term(), State :: #ledger_state{}) ->
+    {noreply, NewState :: #ledger_state{}} |
+    {noreply, NewState :: #ledger_state{}, timeout() | hibernate} |
+    {stop, Reason :: term(), NewState :: #ledger_state{}}).
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -165,7 +164,7 @@ handle_info(_Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-        State :: #state{}) -> term()).
+        State :: #ledger_state{}) -> term()).
 terminate(_Reason, _State) ->
     ok.
 
@@ -177,9 +176,9 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
+-spec(code_change(OldVsn :: term() | {down, term()}, State :: #ledger_state{},
         Extra :: term()) ->
-    {ok, NewState :: #state{}} | {error, Reason :: term()}).
+    {ok, NewState :: #ledger_state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -187,7 +186,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-get_ledger_state_message(#state{head_id = HeadId, head_text = Text}) ->
+get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
     {ledger_state, HeadId, Text}.
 
 get_client_pid({ClientPid, _Tag}) -> ClientPid.

@@ -10,6 +10,7 @@
 -author("nietaki").
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("ledgerServer.hrl").
 
 foo_server_test_() ->
     {foreach, fun setup/0, fun cleanup/1, [
@@ -30,25 +31,25 @@ server_registers_a_client(_Pid) ->
         %gen_server:call(Pid, register),
         %{state, 0, [], _ClientPids, []} = gen_server:call(Pid, get_state)
         
-        ledgerServer:register(),
-        {state, 0, [], ClientPids, []} = ledgerServer:debug_get_state(),
-        ?assert(maps:is_key(self(), ClientPids)),
-        ?assertEqual(0, maps:get(self(), ClientPids))
+        ledgerServer:register("Steve"),
+        #ledger_state{head_id = 0, head_text=[], clients= ClientsMap, changes=[]} = ledgerServer:debug_get_state(),
+        ?assert(maps:is_key(self(), ClientsMap)),
+        ?assertEqual(#client_info{username = "Steve", last_seen_head = 0}, maps:get(self(), ClientsMap))
     end.
 
 server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
     fun() ->
-        ledgerServer:register(),
+        ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
-        {state, 1, "x", _ClientPids, [{insert_char, 0, $x}]} = ledgerServer:debug_get_state(),
+        #ledger_state{head_id = 1, head_text = "x", clients= _Clients, changes=[{insert_char, 0, $x}]} = ledgerServer:debug_get_state(),
         expect_cast({local_changes_accepted,0,1}) 
     end.
 
 server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
     fun() ->
-        ledgerServer:register(),
+        ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}, {insert_char, 1, $y}]),
-        {state, 2, "xy", _ClientPids, [{insert_char, 0, $x}, {insert_char, 1, $y}]} = ledgerServer:debug_get_state(),
+        #ledger_state{head_id=2, head_text="xy", clients=_ClientPids, changes=[{insert_char, 0, $x}, {insert_char, 1, $y}]} = ledgerServer:debug_get_state(),
         expect_cast({local_changes_accepted,0,2}) 
     end.
 
