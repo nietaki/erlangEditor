@@ -26,6 +26,8 @@
     code_change/3]).
 
 -define(SERVER, ?MODULE).
+
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("ledgerServer.hrl").
 
 %%%===================================================================
@@ -187,7 +189,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
-    {ledger_state, HeadId, Text}.
+    {ledger_head_state, HeadId, Text}.
 
 get_client_pid({ClientPid, _Tag}) -> ClientPid.
 
@@ -218,3 +220,16 @@ apply_changes(Text, [H|T]) ->
         {ok, NewText} -> apply_changes(NewText, T);
         Else -> Else
     end.
+
+get_changes_since(LastSeenHeadId, #ledger_state{head_id = HeadId, changes = Changes}) when LastSeenHeadId =< HeadId ->
+    DesiredCount = HeadId - LastSeenHeadId,
+    lists:nthtail(length(Changes) - DesiredCount, Changes).
+
+get_changes_since_test_() ->
+    [
+        ?_assertEqual([], get_changes_since(0, #ledger_state{head_id = 0, changes = []})),
+        ?_assertEqual([], get_changes_since(2, #ledger_state{head_id = 2, changes = [foo, bar]})),
+        ?_assertEqual([bar], get_changes_since(1, #ledger_state{head_id = 2, changes = [foo, bar]})),
+        ?_assertEqual([foo, bar], get_changes_since(0, #ledger_state{head_id = 2, changes = [foo, bar]})),
+        ?_assertError(function_clause, get_changes_since(10000, #ledger_state{head_id = 1, changes = [foo]}))
+    ].

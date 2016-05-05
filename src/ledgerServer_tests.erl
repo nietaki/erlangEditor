@@ -31,7 +31,7 @@ server_registers_a_client(_Pid) ->
         %gen_server:call(Pid, register),
         %{state, 0, [], _ClientPids, []} = gen_server:call(Pid, get_state)
         
-        ledgerServer:register("Steve"),
+        ?assertEqual({ledger_head_state, 0, ""}, ledgerServer:register("Steve")),
         #ledger_state{head_id = 0, head_text=[], clients= ClientsMap, changes=[]} = ledgerServer:debug_get_state(),
         ?assert(maps:is_key(self(), ClientsMap)),
         ?assertEqual(#client_info{username = "Steve", last_seen_head = 0}, maps:get(self(), ClientsMap))
@@ -64,13 +64,13 @@ expect_cast(CastMessage) ->
     end.
 
 setup() ->
-    ?debugMsg("setup"),
+    %?debugMsg("setup"),
     process_flag(trap_exit, true),
     {ok, Pid} = ledgerServer:start_link(),
     Pid.
 
 cleanup(Pid) ->
-    ?debugMsg("cleanup"),
+    %?debugMsg("cleanup"),
     lib:flush_receive(),
     exit(Pid, kill), %% brutal kill!
     ?assertEqual(false, is_process_alive(Pid)).
