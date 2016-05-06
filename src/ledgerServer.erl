@@ -192,7 +192,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
-    {ledger_head_state, HeadId, Text}. %TODO: send the up-to date text, not the state at the old head
+    {ledger_head_state, HeadId, Text}.
 
 get_client_pid({ClientPid, _Tag}) -> ClientPid.
 
