@@ -18,7 +18,8 @@ foo_server_test_() ->
         fun server_registers_a_client/1,
         fun server_registers_a_client_andGetsChangesSubmitted/1,
         fun server_registers_a_client_andGetsTwoChangesSubmitted/1,
-        fun second_client_gets_updated_text/1
+        fun second_client_gets_updated_text/1,
+        fun clients_get_their_changes_on_text_update/1
     ]}.
 
 server_is_alive(Pid) ->
@@ -28,12 +29,9 @@ server_is_alive(Pid) ->
 
 server_registers_a_client(_Pid) ->
     fun() ->
-        %%% previous, non-api way of doing this, for reference
-        %gen_server:call(Pid, register),
-        %{state, 0, [], _ClientPids, []} = gen_server:call(Pid, get_state)
-        
-        ?assertEqual({ledger_head_state, 0, ""}, ledgerServer:register("Steve")),
-        #ledger_state{head_id = 0, head_text=[], clients= ClientsMap, changes=[]} = ledgerServer:debug_get_state(),
+        ?assertEqual({ledger_head_state, 0, ""}, 
+        ledgerServer:register("Steve")),
+        #ledger_state{head_id = 0, head_text=[], clients=ClientsMap, changes=[]} = ledgerServer:debug_get_state(),
         ?assert(maps:is_key(self(), ClientsMap)),
         ?assertEqual(#client_info{username = "Steve", last_seen_head = 0}, maps:get(self(), ClientsMap))
     end.
@@ -43,7 +41,8 @@ server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
         ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
         ?assertMatch(#ledger_state{head_id = 1, head_text = "x", clients= _Clients, changes=[{insert_char, 0, $x}]}, ledgerServer:debug_get_state()),
-        expect_cast({local_changes_accepted,0,1}) 
+        expect_cast({local_changes_accepted,0,1}),
+        expect_no_cast()
     end.
 
 server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
@@ -60,7 +59,7 @@ second_client_gets_updated_text(_Pid) ->
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
         
         Proxy = server_proxy:start(ledgerServer),
-        Response = server_proxy:call(Proxy, {register, "John"}),
+        Response = server_proxy:run_fun(Proxy, fun() -> ledgerServer:register("John") end),
         
         ?assertEqual({ledger_head_state, 1, "x"}, Response),
         #ledger_state{clients=Clients} = ledgerServer:debug_get_state(),
@@ -68,14 +67,42 @@ second_client_gets_updated_text(_Pid) ->
         server_proxy:kill(Proxy)
     end.
 
+clients_get_their_changes_on_text_update(_Pid) ->
+    fun() ->
+        % Arrange
+        Proxy = server_proxy:start(ledgerServer),
+        server_proxy:run_fun(Proxy, fun() -> ledgerServer:register("John") end),
+        
+        ledgerServer:register("Steve"),
+        
+        % Act
+        ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
+        
+        % Assert
+        expect_cast({local_changes_accepted,0,1}),
+        expect_no_cast(),
+        
+        ?assertMatch({changes_were_made_message_here}, server_proxy:receive_a_cast_message(Proxy)), %TODO continue on this 
+        
+        % A cleanup ;)
+        server_proxy:kill(Proxy)
+    end.
+
 %% utility functions
 
 expect_cast(CastMessage) ->
     receive
-        Msg ->
-            ?assertEqual({'$gen_cast', CastMessage}, Msg)
+        {'$gen_cast', ReceivedMessage}->
+            ?assertEqual(CastMessage, ReceivedMessage)
     after 10 ->
         ?assert(false)
+    end.
+
+expect_no_cast() ->
+    receive
+        {'$gen_cast', _ReceivedMessage} -> ?assert(false)
+    after 10 ->
+        ?assert(true)
     end.
 
 setup() ->

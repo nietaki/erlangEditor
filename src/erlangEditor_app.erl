@@ -10,7 +10,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, Pid} = erlangEditor_sup:start_link().
+    {ok, _Pid} = erlangEditor_sup:start_link().
 
 stop(_State) ->
     ok.
