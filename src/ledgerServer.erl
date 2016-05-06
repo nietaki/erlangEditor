@@ -108,7 +108,7 @@ debug_get_state() ->
     {noreply, NewState :: #ledger_state{}} |
     {noreply, NewState :: #ledger_state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #ledger_state{}}).
-handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}, State) ->
+handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}=Message, State) ->
     #ledger_state{head_id = StateHeadId} = State,
     case BaseHeadId of
         StateHeadId -> 
@@ -125,11 +125,14 @@ handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}, State) ->
                             gen_server:cast(Pid, {local_changes_accepted, OldId, length(NewChanges)}),
                             {noreply, State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges}};
                         _ -> 
+                            io:format("couldn't apply incorrect changes: ~w~n", Message),
                             {noreply, State} %changes couldn't be applied
                     end
             end; 
         Older when Older < StateHeadId -> {noreply, State}; %TODO send the changes since older
-        Newer when Newer > StateHeadId -> error(received_head_id_too_new)
+        Newer when Newer > StateHeadId ->
+            io:format("can't apply changes based on head_id from the future: ~w~n", Message),
+            error(received_head_id_too_new)
     end;
 handle_cast(_Request, State) ->
     {noreply, State}.
@@ -189,7 +192,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
-    {ledger_head_state, HeadId, Text}.
+    {ledger_head_state, HeadId, Text}. %TODO: send the up-to date text, not the state at the old head
 
 get_client_pid({ClientPid, _Tag}) -> ClientPid.
 
