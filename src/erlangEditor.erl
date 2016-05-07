@@ -15,6 +15,7 @@
 -include("../deps/cecho/include/cecho.hrl").
 
 start() -> 
+    cluster_utils:join_server_cluster(),
     application:ensure_all_started(erlangEditor),
     application:start(erlangEditor).
 

@@ -43,7 +43,11 @@
 -spec(start_link() ->
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+    ServerRef = server_ref(),
+    debug_msg("starting server as ~w", [ServerRef]),
+    gen_server:start_link(ServerRef, ?MODULE, [], []).
+
+server_ref() -> {global, ?MODULE}.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -64,6 +68,7 @@ start_link() ->
     {ok, State :: #ledger_state{}} | {ok, State :: #ledger_state{}, timeout() | hibernate} |
     {stop, Reason :: term()} | ignore).
 init([]) ->
+    debug_msg("ledger_server started", []),
     {ok, #ledger_state{}}.
 
 %%--------------------------------------------------------------------
@@ -85,6 +90,7 @@ handle_call({register, Username}, From, State) ->
     #ledger_state{head_id = HeadId, clients = Clients} = State,
     NewClientState = #client_info{username = Username, last_seen_head = HeadId},
     NewClients = Clients#{get_client_pid(From) => NewClientState},
+    debug_msg("client ~s joined as pid ~w", [Username, From]),
     {reply, get_ledger_state_message(State), State#ledger_state{clients = NewClients}};
 handle_call(get_state, _From, State) ->
     {reply, State, State};
@@ -92,10 +98,10 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 register(Username) ->
-    gen_server:call(?MODULE, {register, Username}).
+    gen_server:call(server_ref(), {register, Username}).
 
 debug_get_state() ->
-    gen_server:call(?MODULE, get_state).
+    gen_server:call(server_ref(), get_state).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -146,7 +152,7 @@ handle_cast(_Request, State) ->
     {noreply, State}.
 
 submit_local_changes(Pid, BaseHeadId, NewChanges) ->
-    gen_server:cast(?MODULE, {submit_local_changes, Pid, BaseHeadId, NewChanges}).
+    gen_server:cast(server_ref(), {submit_local_changes, Pid, BaseHeadId, NewChanges}).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -259,3 +265,7 @@ get_changes_since_test_() ->
         ?_assertEqual([foo, bar], get_changes_since(0, #ledger_state{head_id = 2, changes = [foo, bar]})),
         ?_assertError(function_clause, get_changes_since(10000, #ledger_state{head_id = 1, changes = [foo]}))
     ].
+
+debug_msg(Format, Arguments) ->
+    io:format(Format, Arguments),
+    io:nl().

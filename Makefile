@@ -14,8 +14,14 @@ test:
 clean: 
 	@$(REBAR) clean
 
-run: all
-	erl -noinput -pa ./deps/cecho/ebin -pa ./ebin -s erlangEditor start +A 50
+client: all
+	erl -noinput -sname client@localhost -setcookie pass -pa ./deps/cecho/ebin -pa ./ebin -s erlangEditor start +A 50
+
+client2: all
+	erl -noinput -sname client2@localhost -setcookie pass -pa ./deps/cecho/ebin -pa ./ebin -s erlangEditor start +A 50
+
+server: all
+	erl -pa ./ebin -sname server@localhost -setcookie pass -s ledgerServer start_link +A 50
 
 shell: all
-	erl -pa ./ebin
+	erl -pa ./ebin -sname shell@localhost -setcookie pass -s cluster_utils join_server_cluster
