@@ -19,7 +19,8 @@ foo_server_test_() ->
         fun server_registers_a_client_andGetsChangesSubmitted/1,
         fun server_registers_a_client_andGetsTwoChangesSubmitted/1,
         fun second_client_gets_updated_text/1,
-        fun clients_get_their_changes_on_text_update/1
+        fun clients_get_their_changes_on_text_update/1,
+        fun client_gets_ledger_changed_message_if_they_post_changes_with_old_head_id/1
     ]}.
 
 server_is_alive(Pid) ->
@@ -89,6 +90,21 @@ clients_get_their_changes_on_text_update(_Pid) ->
         server_proxy:kill(Proxy)
     end.
 
+client_gets_ledger_changed_message_if_they_post_changes_with_old_head_id(_Pid) ->
+    fun() ->
+        Proxy = server_proxy:start(ledgerServer),
+        server_proxy:run_fun(Proxy, fun() -> ledgerServer:register("John") end),
+        
+        ledgerServer:register("Steve"),
+        server_proxy:run_fun(Proxy, fun() -> ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]) end),
+        ?assertMatch({local_changes_accepted,0,1}, server_proxy:receive_a_cast_message(Proxy)),
+        
+        ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $y}]),
+        expect_cast({ledger_changed, 0, [{insert_char, 0, $x}]}),
+        
+        server_proxy:kill(Proxy)
+    end.
+
 %% utility functions
 
 expect_cast(CastMessage) ->
@@ -96,7 +112,7 @@ expect_cast(CastMessage) ->
         {'$gen_cast', ReceivedMessage}->
             ?assertEqual(CastMessage, ReceivedMessage)
     after 10 ->
-        ?assert(false)
+        ?assert(no_cast_message_received)
     end.
 
 expect_no_cast() ->

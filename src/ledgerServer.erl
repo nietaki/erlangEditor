@@ -113,28 +113,30 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
     case BaseHeadId of
         StateHeadId -> 
             case lists:all(fun is_a_change/1, NewChanges) of
-                false -> {noreply, State}; %changes were broken
+                false ->
+                    io:format("received broken changes~n"),
+                    {noreply, State}; 
                 true ->
                     case apply_changes(State#ledger_state.head_text, NewChanges) of
                         {ok, NewText} -> 
-                            OldId = State#ledger_state.head_id,
+                            #ledger_state{head_id = OldId, changes = OldChanges, clients = ClientsMap} = State,
+                            % updating Sender's last seen head_id
                             NewId = OldId + length(NewChanges),
-                            OldChanges = State#ledger_state.changes,
-                            ClientsMap = State#ledger_state.clients,
                             #{Sender := OldClientInfo} = ClientsMap,
                             NewClientInfo = OldClientInfo#client_info{last_seen_head = NewId},
                             NewClientsMap = ClientsMap#{Sender := NewClientInfo},
+                            
                             gen_server:cast(Sender, {local_changes_accepted, OldId, length(NewChanges)}),
                             StateWithAppliedChanges = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
                             cast_changes_to_all_clients_except_for(StateWithAppliedChanges, Sender),
                             {noreply, StateWithAppliedChanges};
                         _ -> 
                             io:format("couldn't apply incorrect changes: ~w~n", Message),
-                            {noreply, State} %changes couldn't be applied
+                            {noreply, State} 
                     end
             end; 
         Older when Older < StateHeadId -> 
-            %cast_changes_to_client(State, Pid),
+            cast_changes_to_client(State, Sender),
             {noreply, State};
         Newer when Newer > StateHeadId ->
             io:format("can't apply changes based on head_id from the future: ~w~n", Message),
