@@ -82,7 +82,8 @@ clients_get_their_changes_on_text_update(_Pid) ->
         expect_cast({local_changes_accepted,0,1}),
         expect_no_cast(),
         
-        ?assertMatch({changes_were_made_message_here}, server_proxy:receive_a_cast_message(Proxy)), %TODO continue on this 
+        %?assertEqual({}, ledgerServer:debug_get_state()),
+        ?assertMatch({ledger_changed, 0, [{insert_char, 0, $x}]}, server_proxy:receive_a_cast_message(Proxy)),
         
         % A cleanup ;)
         server_proxy:kill(Proxy)

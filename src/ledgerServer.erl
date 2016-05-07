@@ -108,7 +108,7 @@ debug_get_state() ->
     {noreply, NewState :: #ledger_state{}} |
     {noreply, NewState :: #ledger_state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #ledger_state{}}).
-handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}=Message, State) ->
+handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, State) ->
     #ledger_state{head_id = StateHeadId} = State,
     case BaseHeadId of
         StateHeadId -> 
@@ -121,15 +121,21 @@ handle_cast({submit_local_changes, Pid, BaseHeadId, NewChanges}=Message, State) 
                             NewId = OldId + length(NewChanges),
                             OldChanges = State#ledger_state.changes,
                             ClientsMap = State#ledger_state.clients,
-                            NewClientsMap = ClientsMap#{Pid := NewId},
-                            gen_server:cast(Pid, {local_changes_accepted, OldId, length(NewChanges)}),
-                            {noreply, State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges}};
+                            #{Sender := OldClientInfo} = ClientsMap,
+                            NewClientInfo = OldClientInfo#client_info{last_seen_head = NewId},
+                            NewClientsMap = ClientsMap#{Sender := NewClientInfo},
+                            gen_server:cast(Sender, {local_changes_accepted, OldId, length(NewChanges)}),
+                            StateWithAppliedChanges = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
+                            cast_changes_to_all_clients_except_for(StateWithAppliedChanges, Sender),
+                            {noreply, StateWithAppliedChanges};
                         _ -> 
                             io:format("couldn't apply incorrect changes: ~w~n", Message),
                             {noreply, State} %changes couldn't be applied
                     end
             end; 
-        Older when Older < StateHeadId -> {noreply, State}; %TODO send the changes since older
+        Older when Older < StateHeadId -> 
+            %cast_changes_to_client(State, Pid),
+            {noreply, State};
         Newer when Newer > StateHeadId ->
             io:format("can't apply changes based on head_id from the future: ~w~n", Message),
             error(received_head_id_too_new)
@@ -224,6 +230,21 @@ apply_changes(Text, [H|T]) ->
         Else -> Else
     end.
 
+% yes, the casting changes to clients could be optimised by using the map more directly
+cast_changes_to_all_clients_except_for(State, ClientPid) ->
+    ClientList = maps:keys(State#ledger_state.clients),
+    ClientListFiltered = lists:filter(fun(C) -> C =/= ClientPid end, ClientList),
+    lists:map(fun(C) -> cast_changes_to_client(State, C) end, ClientListFiltered).
+
+cast_changes_to_client(State, ClientPid) ->
+    gen_server:cast(ClientPid, get_changes_for_client(State, ClientPid)),
+    ok.
+
+get_changes_for_client(State, ClientPid) ->
+    ClientInfo = maps:get(ClientPid, State#ledger_state.clients),
+    LSH = ClientInfo#client_info.last_seen_head,
+    {ledger_changed, LSH, get_changes_since(LSH, State)}.
+    
 get_changes_since(LastSeenHeadId, #ledger_state{head_id = HeadId, changes = Changes}) when LastSeenHeadId =< HeadId ->
     DesiredCount = HeadId - LastSeenHeadId,
     lists:nthtail(length(Changes) - DesiredCount, Changes).
