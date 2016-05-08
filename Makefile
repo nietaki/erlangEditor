@@ -25,3 +25,6 @@ server: all
 
 shell: all
 	erl -pa ./ebin -sname shell@localhost -setcookie pass -s cluster_utils join_server_cluster
+
+connect: all
+	erl -noinput -pa ./ebin -sname connect@localhost -setcookie pass -s cluster_utils test_connecting_to_server

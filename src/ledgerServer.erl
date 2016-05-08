@@ -98,10 +98,12 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 register(Username) ->
-    gen_server:call(server_ref(), {register, Username}).
+    gen_server:call(server_ref(), {register, Username}, 500).
 
 debug_get_state() ->
     gen_server:call(server_ref(), get_state).
+
+
 
 %%--------------------------------------------------------------------
 %% @private

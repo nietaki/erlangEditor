@@ -71,17 +71,32 @@ start_link() ->
     {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
     {stop, Reason :: term()} | ignore).
 init([]) ->
-    % start cecho
-    ok = cecho:cbreak(),
-    ok = cecho:noecho(),
-    ok = cecho:keypad(?ceSTDSCR, true),
-    ok = cecho:curs_set(?ceCURS_NORMAL),
-    State = starting_state(),
-    repaint(State),
-    % spawn input capturing loop
-    spawn_link(cursesDisplay, getch_loop, [?MODULE]),
-    %return
-    {ok, State}.
+    cluster_utils:join_server_cluster(),
+    Name = "Jacek",
+    RegisterResult = ledgerServer:register(Name),
+    case RegisterResult of
+        {ledger_head_state, _HeadId, Text} ->
+            % start cecho
+            ok = cecho:cbreak(),
+            ok = cecho:noecho(),
+            ok = cecho:keypad(?ceSTDSCR, true),
+            ok = cecho:curs_set(?ceCURS_NORMAL),
+            State = starting_state(Text),
+            repaint(State),
+            % spawn input capturing loop
+            spawn_link(cursesDisplay, getch_loop, [?MODULE]),
+            %return
+            {ok, State};
+        SomethingElse ->
+            io:format("could not register~n"),
+            hard_exit(),
+            {stop, SomethingElse}
+    end. 
+
+hard_exit() ->
+    application:stop(cecho),
+    application:stop(erlangEditor),
+    erlang:halt().
 
 %%--------------------------------------------------------------------
 %% @private
@@ -174,7 +189,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-starting_state() -> #state{text = "Initial text in the editor", cursorPosition = 5}.
+%starting_state() -> #state{text = "Initial text in the editor", cursorPosition = 5}.
+starting_state(InitialText) -> #state{text = InitialText, cursorPosition = length(InitialText)}.
 
 getch_loop(ServerRef) ->
     Ch = cecho:getch(),
