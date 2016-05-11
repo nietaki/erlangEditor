@@ -42,8 +42,8 @@ server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
         ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
         ?assertMatch(#ledger_state{head_id = 1, head_text = "x", clients= _Clients, changes=[{insert_char, 0, $x}]}, ledgerServer:debug_get_state()),
-        expect_cast({local_changes_accepted,0,1}),
-        expect_no_cast()
+        test_utils:expect_cast({local_changes_accepted,0,1}),
+        test_utils:expect_no_cast()
     end.
 
 server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
@@ -51,7 +51,7 @@ server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
         ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}, {insert_char, 1, $y}]),
         ?assertMatch(#ledger_state{head_id=2, head_text="xy", clients=_Clients, changes=[{insert_char, 0, $x}, {insert_char, 1, $y}]}, ledgerServer:debug_get_state()),
-        expect_cast({local_changes_accepted,0,2}) 
+        test_utils:expect_cast({local_changes_accepted,0,2}) 
     end.
 
 second_client_gets_updated_text(_Pid) ->
@@ -80,8 +80,8 @@ clients_get_their_changes_on_text_update(_Pid) ->
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
         
         % Assert
-        expect_cast({local_changes_accepted,0,1}),
-        expect_no_cast(),
+        test_utils:expect_cast({local_changes_accepted,0,1}),
+        test_utils:expect_no_cast(),
         
         %?assertEqual({}, ledgerServer:debug_get_state()),
         ?assertMatch({ledger_changed, 0, [{insert_char, 0, $x}]}, server_proxy:receive_a_cast_message(Proxy)),
@@ -100,26 +100,9 @@ client_gets_ledger_changed_message_if_they_post_changes_with_old_head_id(_Pid) -
         ?assertMatch({local_changes_accepted,0,1}, server_proxy:receive_a_cast_message(Proxy)),
         
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $y}]),
-        expect_cast({ledger_changed, 0, [{insert_char, 0, $x}]}),
+        test_utils:expect_cast({ledger_changed, 0, [{insert_char, 0, $x}]}),
         
         server_proxy:kill(Proxy)
-    end.
-
-%% utility functions
-
-expect_cast(CastMessage) ->
-    receive
-        {'$gen_cast', ReceivedMessage}->
-            ?assertEqual(CastMessage, ReceivedMessage)
-    after 10 ->
-        ?assert(no_cast_message_received)
-    end.
-
-expect_no_cast() ->
-    receive
-        {'$gen_cast', _ReceivedMessage} -> ?assert(false)
-    after 10 ->
-        ?assert(true)
     end.
 
 setup() ->
