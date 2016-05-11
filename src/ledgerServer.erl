@@ -208,7 +208,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
-    {ledger_head_state, HeadId, Text}.
+    #ledger_head_state{head_id = HeadId, head_text = Text}.
 
 get_client_pid({ClientPid, _Tag}) -> ClientPid.
 

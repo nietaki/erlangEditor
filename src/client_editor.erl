@@ -74,7 +74,7 @@ init([DisplayInitFun, DisplayRepaintFun]) ->
     case RegisterResult of
         {ledger_head_state, _HeadId, Text} ->
             {ok, DisplayYX} = DisplayInitFun(self()),
-            State = #client_state{text = Text, cursorPosition = length(Text), display_repaint_fun = DisplayRepaintFun, display_yx = DisplayYX},
+            State = #client_state{text = Text, cursor_position = length(Text), display_repaint_fun = DisplayRepaintFun, display_yx = DisplayYX},
             Repaint = State#client_state.display_repaint_fun,
             ok = Repaint(State),
             {ok, State};
@@ -185,14 +185,14 @@ code_change(_OldVsn, State, _Extra) ->
 -spec(handle_char(State :: #client_state{}, Ch ::char()) -> #client_state{}).
 handle_char(State, Ch) ->
     YX = State#client_state.display_yx,
-    CursorPosition = State#client_state.cursorPosition,
+    CursorPosition = State#client_state.cursor_position,
     NewState = case Ch of
         Printable when Printable >= 20, Printable =< $~ -> insert_character(State, Printable, CursorPosition);
         ?ceKEY_DEL -> delete_character(State, CursorPosition);
-        ?ceKEY_DOWN -> State#client_state{cursorPosition = get_new_position(CursorPosition, YX, down)};
-        ?ceKEY_UP -> State#client_state{cursorPosition = get_new_position(CursorPosition, YX, up)};
-        ?ceKEY_LEFT -> State#client_state{cursorPosition = get_new_position(CursorPosition, YX, left)};
-        ?ceKEY_RIGHT -> State#client_state{cursorPosition = get_new_position(CursorPosition, YX, right)};
+        ?ceKEY_DOWN -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, down)};
+        ?ceKEY_UP -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, up)};
+        ?ceKEY_LEFT -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, left)};
+        ?ceKEY_RIGHT -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, right)};
         ?ceKEY_BACKSPACE -> delete_character(State, CursorPosition - 1);
         ?ceKEY_BACKSPACE2-> delete_character(State, CursorPosition - 1);
         _ -> State           
@@ -200,22 +200,22 @@ handle_char(State, Ch) ->
     end,
     fixup_state_position(NewState).
   
-fixup_state_position(#client_state{text = Text, cursorPosition = Position}=State) ->
-    State#client_state{text = Text, cursorPosition = max(min(Position, string:len(Text)), 0)}.
+fixup_state_position(#client_state{text = Text, cursor_position = Position}=State) ->
+    State#client_state{text = Text, cursor_position = max(min(Position, string:len(Text)), 0)}.
 
-insert_character(#client_state{text = Text, cursorPosition = CurrentPosition}=State, Character, Position) -> 
+insert_character(#client_state{text = Text, cursor_position = CurrentPosition}=State, Character, Position) -> 
     NewCursorPosition = if
         Position =< CurrentPosition-> CurrentPosition + 1;
         true -> CurrentPosition
     end,
-    State#client_state{text = stringOps:insert_char(Text, Character, Position), cursorPosition = NewCursorPosition}.
+    State#client_state{text = stringOps:insert_char(Text, Character, Position), cursor_position = NewCursorPosition}.
 
-delete_character(#client_state{text = Text, cursorPosition = CurrentPosition}=State, PositionToDelete) ->
+delete_character(#client_state{text = Text, cursor_position = CurrentPosition}=State, PositionToDelete) ->
     NewCursorPosition = if
         PositionToDelete < CurrentPosition -> CurrentPosition - 1;
         true -> CurrentPosition
     end, 
-    State#client_state{text = stringOps:delete_char(Text, PositionToDelete), cursorPosition = NewCursorPosition}.
+    State#client_state{text = stringOps:delete_char(Text, PositionToDelete), cursor_position = NewCursorPosition}.
 
 get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     NewPosition = case Direction of

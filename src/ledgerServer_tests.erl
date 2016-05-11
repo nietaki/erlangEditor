@@ -30,7 +30,7 @@ server_is_alive(Pid) ->
 
 server_registers_a_client(_Pid) ->
     fun() ->
-        ?assertEqual({ledger_head_state, 0, ""}, 
+        ?assertEqual(#ledger_head_state{head_id = 0, head_text = ""}, 
         ledgerServer:register("Steve")),
         #ledger_state{head_id = 0, head_text=[], clients=ClientsMap, changes=[]} = ledgerServer:debug_get_state(),
         ?assert(maps:is_key(self(), ClientsMap)),
@@ -62,7 +62,7 @@ second_client_gets_updated_text(_Pid) ->
         Proxy = server_proxy:start(ledgerServer),
         Response = server_proxy:run_fun(Proxy, fun() -> ledgerServer:register("John") end),
         
-        ?assertEqual({ledger_head_state, 1, "x"}, Response),
+        ?assertEqual(#ledger_head_state{ head_id = 1, head_text = "x"}, Response),
         #ledger_state{clients=Clients} = ledgerServer:debug_get_state(),
         ?assert(length(maps:keys(Clients)) =:= 2),
         server_proxy:kill(Proxy)

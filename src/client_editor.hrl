@@ -8,9 +8,18 @@
 %%%-------------------------------------------------------------------
 -author("nietaki").
 
+
+
+-record(local_state, {
+    changes = [],
+    cursor_position = 0,
+    resulting_text = ""
+}).
+
 -record(client_state, {
     text,
-    cursorPosition,
+    cursor_position,
+    %display stuff
     display_repaint_fun,
     display_yx
 }).
