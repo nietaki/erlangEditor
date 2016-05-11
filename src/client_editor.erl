@@ -69,7 +69,7 @@ start_link(InitFun, RepaintFun) ->
     {stop, Reason :: term()} | ignore).
 init([DisplayInitFun, DisplayRepaintFun]) ->
     cluster_utils:join_server_cluster(),
-    Name = "Jacek",
+    Name = random_name(),
     RegisterResult = ledgerServer:register(Name),
     case RegisterResult of
         {ledger_head_state, _HeadId, Text} ->
@@ -228,3 +228,10 @@ get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     min(max(0, NewPosition), ConsoleHeight * ConsoleWidth - 1).
     
 
+possible_names() ->
+    ["Thomas", "James", "Jack", "Daniel", "Matthew", "Ryan", "Luke", "Samuel", "Jordan", "Adam", "Christopher", "Benjamin", "Joseph", "Liam", "William", "George", "Oliver", "Nathan", "Harry", "Kyle"].
+
+random_name() ->
+    Names = possible_names(),
+    Idx = random:uniform(length(Names)),
+    lists:nth(Idx, Names).
