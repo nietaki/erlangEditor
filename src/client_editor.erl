@@ -126,7 +126,9 @@ handle_cast({ch, Ch}, #client_state{local_state = LocalState, display_yx = YX} =
     NewLocalState = handle_char(LocalState, YX, Ch),
     RepaintFun = State#client_state.display_repaint_fun,
     RepaintFun(NewLocalState),
-    {noreply, State#client_state{local_state = NewLocalState}};
+    EndState = State#client_state{local_state = NewLocalState},
+    submit_local_changes(EndState),
+    {noreply, EndState};
 handle_cast(_Request, State) ->
     {noreply, State}.
 
@@ -196,24 +198,29 @@ handle_char(LocalState, YX, Ch) ->
         _ -> LocalState           
         %SomethingElse -> error(SomethingElse) 
     end,
-    fixup_state_position(NewLocalState).
+    EndState = fixup_state_position(NewLocalState),
+    EndState.
   
 fixup_state_position(#local_state{resulting_text = Text, cursor_position = Position}= LocalState) ->
     LocalState#local_state{resulting_text = Text, cursor_position = max(min(Position, string:len(Text)), 0)}.
 
-insert_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition}= LocalState, Character, Position) -> 
+insert_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition, changes = Changes}= LocalState, Character, Position) -> 
     NewCursorPosition = if
         Position =< CurrentPosition-> CurrentPosition + 1;
         true -> CurrentPosition
     end,
-    LocalState#local_state{resulting_text = stringOps:insert_char(Text, Character, Position), cursor_position = NewCursorPosition}.
+    LocalState#local_state{resulting_text = stringOps:insert_char(Text, Character, Position), 
+        cursor_position = NewCursorPosition, 
+        changes = [{insert_char, Position, Character}| Changes]}.
 
-delete_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition}= LocalState, PositionToDelete) ->
+delete_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition} = LocalState, PositionToDelete) ->
     NewCursorPosition = if
         PositionToDelete < CurrentPosition -> CurrentPosition - 1;
         true -> CurrentPosition
     end, 
-    LocalState#local_state{resulting_text = stringOps:delete_char(Text, PositionToDelete), cursor_position = NewCursorPosition}.
+    LocalState#local_state{resulting_text = stringOps:delete_char(Text, PositionToDelete), 
+        cursor_position = NewCursorPosition,
+        changes = [{delete_char, PositionToDelete}]}.
 
 get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     NewPosition = case Direction of
@@ -224,6 +231,16 @@ get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
         %_ -> OriginalPosition 
     end,
     min(max(0, NewPosition), ConsoleHeight * ConsoleWidth - 1).
+
+submit_local_changes(#client_state{ledger_head_state = LedgerHeadState, local_state = LocalState}) ->
+    LocalChanges = LocalState#local_state.changes,
+    case LocalChanges of
+        [] -> ok;
+        NonEmpty ->
+            OldestToNewestChanges = lists:reverse(NonEmpty),
+            ledgerServer:submit_local_changes(self(), LedgerHeadState#ledger_head_state.head_id, OldestToNewestChanges),
+            ok
+    end.
 
 possible_names() ->
     ["Thomas", "James", "Jack", "Daniel", "Matthew", "Ryan", "Luke", "Samuel", "Jordan", "Adam", "Christopher", "Benjamin", "Joseph", "Liam", "William", "George", "Oliver", "Nathan", "Harry", "Kyle"].

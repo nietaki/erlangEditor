@@ -26,5 +26,5 @@ init([]) ->
     %Editor = {erlangEditor, {erlangEditor, cecho_test, []}, permanent, 20, worker, [erlangEditor]},
     Display = {client_editor, {client_editor, start_link, []}, permanent, 20, worker, [erlangEditor]},
     Children = [Display],
-    {ok, { {one_for_one, 5, 10}, Children}}.
+    {ok, { {one_for_one, 1, 10}, Children}}.
 

@@ -44,7 +44,7 @@
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
     ServerRef = server_ref(),
-    debug_msg("starting server as ~w", [ServerRef]),
+    debug_msg("starting server as ~p", [ServerRef]),
     gen_server:start_link(ServerRef, ?MODULE, [], []).
 
 server_ref() -> {global, ?MODULE}.
@@ -90,7 +90,7 @@ handle_call({register, Username}, From, State) ->
     #ledger_state{head_id = HeadId, clients = Clients} = State,
     NewClientState = #client_info{username = Username, last_seen_head = HeadId},
     NewClients = Clients#{get_client_pid(From) => NewClientState},
-    debug_msg("client ~s joined as pid ~w", [Username, From]),
+    debug_msg("client ~s joined as pid ~p", [Username, From]),
     {reply, get_ledger_state_message(State), State#ledger_state{clients = NewClients}};
 handle_call(get_state, _From, State) ->
     {reply, State, State};
@@ -122,9 +122,10 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
         StateHeadId -> 
             case lists:all(fun is_a_change/1, NewChanges) of
                 false ->
-                    io:format("received broken changes~n"),
+                    debug_msg("received broken changes", []),
                     {noreply, State}; 
                 true ->
+                    debug_msg("received changes ~p", [Message]),
                     case apply_changes(State#ledger_state.head_text, NewChanges) of
                         {ok, NewText} -> 
                             #ledger_state{head_id = OldId, changes = OldChanges, clients = ClientsMap} = State,
@@ -137,9 +138,11 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                             gen_server:cast(Sender, {local_changes_accepted, OldId, length(NewChanges)}),
                             StateWithAppliedChanges = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
                             cast_changes_to_all_clients_except_for(StateWithAppliedChanges, Sender),
+                            debug_msg("changes applied", []),
+                            debug_msg("new state: ~p", [StateWithAppliedChanges]),
                             {noreply, StateWithAppliedChanges};
                         _ -> 
-                            io:format("couldn't apply incorrect changes: ~w~n", Message),
+                            debug_msg("couldn't apply incorrect changes", []),
                             {noreply, State} 
                     end
             end; 
@@ -147,7 +150,7 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
             cast_changes_to_client(State, Sender),
             {noreply, State};
         Newer when Newer > StateHeadId ->
-            io:format("can't apply changes based on head_id from the future: ~w~n", Message),
+            debug_msg("can't apply changes based on head_id from the future: ~p~n", [Message]),
             error(received_head_id_too_new)
     end;
 handle_cast(_Request, State) ->
