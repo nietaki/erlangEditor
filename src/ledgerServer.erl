@@ -103,8 +103,6 @@ register(Username) ->
 debug_get_state() ->
     gen_server:call(server_ref(), get_state).
 
-
-
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -146,7 +144,8 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                             {noreply, State} 
                     end
             end; 
-        Older when Older < StateHeadId -> 
+        Older when Older < StateHeadId ->
+            debug_msg("received old changes: ~p", [Message]),
             cast_changes_to_client(State, Sender),
             {noreply, State};
         Newer when Newer > StateHeadId ->

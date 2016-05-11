@@ -16,6 +16,8 @@
 
 %% API
 -export([start_link/0, start_link/2]).
+-export([send_char/2, send_keystroke/2]).
+-export([debug_get_state/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -105,8 +107,10 @@ hard_exit() ->
     {noreply, NewState :: #client_state{}, timeout() | hibernate} |
     {stop, Reason :: term(), Reply :: term(), NewState :: #client_state{}} |
     {stop, Reason :: term(), NewState :: #client_state{}}).
-handle_call(_Request, _From, State) ->
-    {reply, ok, State}.
+handle_call(get_state, _From, State) ->
+    {reply, State, State}.
+
+debug_get_state(Pid) -> gen_server:call(Pid, get_state).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -131,6 +135,16 @@ handle_cast({ch, Ch}, #client_state{local_state = LocalState, display_yx = YX} =
     {noreply, EndState};
 handle_cast(_Request, State) ->
     {noreply, State}.
+
+send_char(Pid, Char) when is_integer(Char) ->
+    gen_server:cast(Pid, {ch, Char}).
+
+send_keystroke(Pid, down) -> send_char(Pid, ?ceKEY_DOWN);
+send_keystroke(Pid, up) -> send_char(Pid, ?ceKEY_UP);
+send_keystroke(Pid, left) -> send_char(Pid, ?ceKEY_LEFT);
+send_keystroke(Pid, right) -> send_char(Pid, ?ceKEY_RIGHT);
+send_keystroke(Pid, delete) -> send_char(Pid, ?ceKEY_DEL);
+send_keystroke(Pid, backspace) -> send_char(Pid, ?ceKEY_BACKSPACE).
 
 %%--------------------------------------------------------------------
 %% @private

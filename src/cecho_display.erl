@@ -30,7 +30,7 @@ initialize(ServerRef) ->
 
 getch_loop(ServerRef) ->
     Ch = cecho:getch(),
-    gen_server:cast(ServerRef, {ch, Ch}),
+    client_editor:send_char(ServerRef, Ch),
     getch_loop(ServerRef).
 
 %this will accept client_state initially, display_state later on
