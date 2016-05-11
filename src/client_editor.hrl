@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -author("nietaki").
 
-
+-include("ledgerServer.hrl").
 
 -record(local_state, {
     changes = [],
@@ -17,8 +17,8 @@
 }).
 
 -record(client_state, {
-    text,
-    cursor_position,
+    ledger_head_state = #ledger_head_state{},
+    local_state = #local_state{},
     %display stuff
     display_repaint_fun,
     display_yx

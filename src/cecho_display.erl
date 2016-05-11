@@ -34,9 +34,8 @@ getch_loop(ServerRef) ->
     getch_loop(ServerRef).
 
 %this will accept client_state initially, display_state later on
--spec(repaint(State :: #client_state{}) -> {ok, integer()}).
-repaint(State) -> 
-    #client_state{text = Text, cursor_position = Pos} = State,
+-spec(repaint(State :: #local_state{}) -> {ok, integer()}).
+repaint(#local_state{resulting_text = Text, cursor_position = Pos}) -> 
     ok = cecho:erase(),
     ok = cecho:mvaddstr(0, 0, Text),
     {_Height, Width} = cecho:getmaxyx(),

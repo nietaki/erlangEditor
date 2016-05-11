@@ -72,11 +72,12 @@ init([DisplayInitFun, DisplayRepaintFun]) ->
     Name = random_name(),
     RegisterResult = ledgerServer:register(Name),
     case RegisterResult of
-        {ledger_head_state, _HeadId, Text} ->
+        #ledger_head_state{head_id = _HeadId, head_text = Text} = LedgerHeadState ->
             {ok, DisplayYX} = DisplayInitFun(self()),
-            State = #client_state{text = Text, cursor_position = length(Text), display_repaint_fun = DisplayRepaintFun, display_yx = DisplayYX},
+            LocalState = #local_state{ cursor_position = length(Text), resulting_text = Text},
+            State = #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState, display_repaint_fun = DisplayRepaintFun, display_yx = DisplayYX},
             Repaint = State#client_state.display_repaint_fun,
-            ok = Repaint(State),
+            ok = Repaint(LocalState),
             {ok, State};
         SomethingElse ->
             io:format("could not register~n"),
@@ -121,13 +122,11 @@ handle_call(_Request, _From, State) ->
 handle_cast({ch, ?ceKEY_ESC}, State) -> 
     erlangEditor:stop(),
     {stop, user_pressed_esc, State};
-handle_cast({ch, Ch}, State) ->
-    NewState = handle_char(State, Ch),
+handle_cast({ch, Ch}, #client_state{local_state = LocalState, display_yx = YX} = State) ->
+    NewLocalState = handle_char(LocalState, YX, Ch),
     RepaintFun = State#client_state.display_repaint_fun,
-    RepaintFun = NewState#client_state.display_repaint_fun,
-    RepaintFun(NewState),
-    %repaint(NewState),
-    {noreply, NewState};
+    RepaintFun(NewLocalState),
+    {noreply, State#client_state{local_state = NewLocalState}};
 handle_cast(_Request, State) ->
     {noreply, State}.
 
@@ -182,40 +181,39 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
--spec(handle_char(State :: #client_state{}, Ch ::char()) -> #client_state{}).
-handle_char(State, Ch) ->
-    YX = State#client_state.display_yx,
-    CursorPosition = State#client_state.cursor_position,
-    NewState = case Ch of
-        Printable when Printable >= 20, Printable =< $~ -> insert_character(State, Printable, CursorPosition);
-        ?ceKEY_DEL -> delete_character(State, CursorPosition);
-        ?ceKEY_DOWN -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, down)};
-        ?ceKEY_UP -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, up)};
-        ?ceKEY_LEFT -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, left)};
-        ?ceKEY_RIGHT -> State#client_state{cursor_position = get_new_position(CursorPosition, YX, right)};
-        ?ceKEY_BACKSPACE -> delete_character(State, CursorPosition - 1);
-        ?ceKEY_BACKSPACE2-> delete_character(State, CursorPosition - 1);
-        _ -> State           
+-spec(handle_char(LocalState :: #local_state{}, YX :: {integer(), integer()}, Ch ::char()) -> #client_state{}).
+handle_char(LocalState, YX, Ch) ->
+    CursorPosition = LocalState#local_state.cursor_position,
+    NewLocalState = case Ch of
+        Printable when Printable >= 20, Printable =< $~ -> insert_character(LocalState, Printable, CursorPosition);
+        ?ceKEY_DOWN -> LocalState#local_state{cursor_position = get_new_position(CursorPosition, YX, down)};
+        ?ceKEY_UP -> LocalState#local_state{cursor_position = get_new_position(CursorPosition, YX, up)};
+        ?ceKEY_LEFT -> LocalState#local_state{cursor_position = get_new_position(CursorPosition, YX, left)};
+        ?ceKEY_RIGHT -> LocalState#local_state{cursor_position = get_new_position(CursorPosition, YX, right)};
+        ?ceKEY_DEL -> delete_character(LocalState, CursorPosition);
+        ?ceKEY_BACKSPACE -> delete_character(LocalState, CursorPosition - 1);
+        ?ceKEY_BACKSPACE2-> delete_character(LocalState, CursorPosition - 1);
+        _ -> LocalState           
         %SomethingElse -> error(SomethingElse) 
     end,
-    fixup_state_position(NewState).
+    fixup_state_position(NewLocalState).
   
-fixup_state_position(#client_state{text = Text, cursor_position = Position}=State) ->
-    State#client_state{text = Text, cursor_position = max(min(Position, string:len(Text)), 0)}.
+fixup_state_position(#local_state{resulting_text = Text, cursor_position = Position}= LocalState) ->
+    LocalState#local_state{resulting_text = Text, cursor_position = max(min(Position, string:len(Text)), 0)}.
 
-insert_character(#client_state{text = Text, cursor_position = CurrentPosition}=State, Character, Position) -> 
+insert_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition}= LocalState, Character, Position) -> 
     NewCursorPosition = if
         Position =< CurrentPosition-> CurrentPosition + 1;
         true -> CurrentPosition
     end,
-    State#client_state{text = stringOps:insert_char(Text, Character, Position), cursor_position = NewCursorPosition}.
+    LocalState#local_state{resulting_text = stringOps:insert_char(Text, Character, Position), cursor_position = NewCursorPosition}.
 
-delete_character(#client_state{text = Text, cursor_position = CurrentPosition}=State, PositionToDelete) ->
+delete_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition}= LocalState, PositionToDelete) ->
     NewCursorPosition = if
         PositionToDelete < CurrentPosition -> CurrentPosition - 1;
         true -> CurrentPosition
     end, 
-    State#client_state{text = stringOps:delete_char(Text, PositionToDelete), cursor_position = NewCursorPosition}.
+    LocalState#local_state{resulting_text = stringOps:delete_char(Text, PositionToDelete), cursor_position = NewCursorPosition}.
 
 get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     NewPosition = case Direction of
@@ -226,7 +224,6 @@ get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
         %_ -> OriginalPosition 
     end,
     min(max(0, NewPosition), ConsoleHeight * ConsoleWidth - 1).
-    
 
 possible_names() ->
     ["Thomas", "James", "Jack", "Daniel", "Matthew", "Ryan", "Luke", "Samuel", "Jordan", "Adam", "Christopher", "Benjamin", "Joseph", "Liam", "William", "George", "Oliver", "Nathan", "Harry", "Kyle"].
