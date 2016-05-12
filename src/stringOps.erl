@@ -12,6 +12,7 @@
 -include_lib("eunit/include/eunit.hrl").
 %% API
 -export([insert_char/3, delete_char/2, split/2, is_a_change/1, apply_change/2, apply_changes/2]).
+-export([apply_change_to_position/2, apply_changes_to_position/2]).
 
 delete_char(String, Position) ->
     lists:reverse(delete_character_1(String, Position, [])).
@@ -96,3 +97,36 @@ apply_changes(Text, [H|T]) ->
         {ok, NewText} -> apply_changes(NewText, T);
         Else -> Else
     end.
+
+% moves the position of something in the text to where it will be after the change is applied to the text
+apply_change_to_position({insert_char, ChangePos, _Char}, Position) when ChangePos =< Position -> Position + 1;
+apply_change_to_position({insert_char, _ChangePos, _Char}, Position) -> Position;
+apply_change_to_position({delete_char, ChangePos}, Position) when ChangePos =< Position -> max(0, Position - 1);
+apply_change_to_position({delete_char, _ChangePos}, Position) -> Position.
+   
+apply_change_to_position_test_() -> [
+    ?_assertEqual(4, apply_change_to_position({insert_char, 0, $x}, 3)),
+    ?_assertEqual(1, apply_change_to_position({insert_char, 0, $x}, 0)),
+    ?_assertEqual(0, apply_change_to_position({insert_char, 5, $x}, 0)),
+    ?_assertEqual(4, apply_change_to_position({insert_char, 100, $x}, 4)),
+    % deletes
+    ?_assertEqual(4, apply_change_to_position({delete_char, 1}, 5)),
+    ?_assertEqual(4, apply_change_to_position({delete_char, 0}, 5)),
+    ?_assertEqual(0, apply_change_to_position({delete_char, 0}, 0)),
+    ?_assertEqual(5, apply_change_to_position({delete_char, 9}, 5)),
+    ?_assertEqual(0, apply_change_to_position({delete_char, 9}, 0))
+].
+
+apply_changes_to_position([], Position) -> Position;
+apply_changes_to_position([H|T], Position) -> apply_changes_to_position(T, apply_change_to_position(H, Position)).
+
+apply_changes_to_position_test_() -> [
+    ?_assertEqual(4, apply_changes_to_position([{insert_char, 0, $x}], 3)),
+    ?_assertEqual(4, apply_changes_to_position([{insert_char, 0, $x}, {insert_char, 9, $x}], 3)),
+    ?_assertEqual(5, apply_changes_to_position([{insert_char, 0, $x}, {insert_char, 1, $x}], 3)),
+    ?_assertEqual(5, apply_changes_to_position([{insert_char, 0, $x}, {insert_char, 0, $x}], 3)),
+    ?_assertEqual(3, apply_changes_to_position([{insert_char, 0, $x}, {delete_char, 0}], 3)),
+    ?_assertEqual(6, apply_changes_to_position([{insert_char, 0, $x}, {insert_char, 0, $x}, {insert_char, 4, $x}], 3))
+].
+
+%UP NEXT: rebase_changes(MasterChanges, LocalChanges) -> RebasedLocalChanges
