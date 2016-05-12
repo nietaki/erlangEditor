@@ -20,7 +20,8 @@ client_editor_test_() ->
         fun client_connects_to_server/1,
         fun client_sends_a_letter_to_the_server_and_gets_its_changes_accepted/1,
         fun client_works_with_two_separate_changes/1,
-        fun client_works_with_two_changes_one_after_another/1
+        fun client_works_with_two_changes_one_after_another/1,
+        fun a_client_gets_ther_clients_changes/1
     ]}.
 
 client_connects_to_server(ServerPid) ->
@@ -32,9 +33,8 @@ client_connects_to_server(ServerPid) ->
         kill_client(ClientPid)
     end.
 
-client_sends_a_letter_to_the_server_and_gets_its_changes_accepted(ServerPid) ->
+client_sends_a_letter_to_the_server_and_gets_its_changes_accepted(_ServerPid) ->
     fun() ->
-        ?assertEqual(true, is_process_alive(ServerPid)),
         ClientPid = spawn_client(),
         client_editor:send_char(ClientPid, $q),
         timer:sleep(10),
@@ -47,9 +47,8 @@ client_sends_a_letter_to_the_server_and_gets_its_changes_accepted(ServerPid) ->
         kill_client(ClientPid)
     end.
 
-client_works_with_two_separate_changes(ServerPid) ->
+client_works_with_two_separate_changes(_ServerPid) ->
     fun() ->
-        ?assertEqual(true, is_process_alive(ServerPid)),
         ClientPid = spawn_client(),
         client_editor:send_char(ClientPid, $a),
         timer:sleep(10),
@@ -64,9 +63,8 @@ client_works_with_two_separate_changes(ServerPid) ->
         kill_client(ClientPid)
     end.
 
-client_works_with_two_changes_one_after_another(ServerPid) ->
+client_works_with_two_changes_one_after_another(_ServerPid) ->
     fun() ->
-        ?assertEqual(true, is_process_alive(ServerPid)),
         ClientPid = spawn_client(),
         client_editor:send_char(ClientPid, $a),
         client_editor:send_char(ClientPid, $b),
@@ -80,10 +78,29 @@ client_works_with_two_changes_one_after_another(ServerPid) ->
         kill_client(ClientPid)
     end.
 
+a_client_gets_ther_clients_changes(_ServerPid) ->
+    fun() ->
+        A = spawn_client(a),
+        B = spawn_client(b),
+        client_editor:send_char(A, $a),
+        AState = client_editor:debug_get_state(A),
+        BState = client_editor:debug_get_state(B), 
+        
+        ?assertMatch(#ledger_state{head_id = 1, head_text = "a"}, ledgerServer:debug_get_state()),
+        
+        % client's changes should already be accepted
+        ?assertMatch(#ledger_head_state{head_id = 1, head_text = "a"}, AState#client_state.ledger_head_state),
+        ?assertMatch(#ledger_head_state{head_id = 1, head_text = "a"}, BState#client_state.ledger_head_state),
+        kill_client(A),
+        kill_client(B)
+    end.
+
 
 % util functions
-spawn_client() ->
-    {ok, ClientPid} = client_editor:start_link(fun initializeNop/1, fun repaintNop/1),
+spawn_client() -> spawn_client(client_editor).
+
+spawn_client(ArbitraryName) ->
+    {ok, ClientPid} = client_editor:start_link(fun initializeNop/1, fun repaintNop/1, ArbitraryName),
     ClientPid.
 
 kill_client(Pid) ->

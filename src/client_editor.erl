@@ -15,7 +15,7 @@
 -include("client_editor.hrl").
 
 %% API
--export([start_link/0, start_link/2]).
+-export([start_link/0, start_link/2, start_link/3]).
 -export([send_char/2, send_keystroke/2]).
 -export([debug_get_state/1]).
 
@@ -50,6 +50,9 @@ start_link() ->
 start_link(InitFun, RepaintFun) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [InitFun, RepaintFun], []).
 
+start_link(InitFun, RepaintFun, ArbitraryName) ->
+    gen_server:start_link({local, ArbitraryName}, ?MODULE, [InitFun, RepaintFun], []).
+    
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -134,7 +137,7 @@ handle_cast({ch, Ch}, #client_state{local_state = LocalState, display_yx = YX} =
     submit_local_changes(EndState),
     {noreply, EndState};
 handle_cast({local_changes_accepted, OldId, ChangeCount}, State) ->
-    #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState} = State,
+    #client_state{ledger_head_state = LedgerHeadState, local_state = _LocalState} = State,
     LastSeenLedgerHead = LedgerHeadState#ledger_head_state.head_id, 
     NewState = if
         OldId =< LastSeenLedgerHead ->
