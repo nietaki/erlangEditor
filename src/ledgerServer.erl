@@ -146,7 +146,14 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
             end; 
         Older when Older < StateHeadId ->
             debug_msg("received old changes: ~p", [Message]),
-            cast_changes_to_client(State, Sender),
+            LSH = get_last_seen_head_id_for_client(State, Sender),
+            if
+                LSH > Older -> 
+                    % client has seen, and probably created, changes newer than these, let's not resend them to them
+                    ok;
+                true -> 
+                    cast_changes_to_client(State, Sender)
+            end,
             {noreply, State};
         Newer when Newer > StateHeadId ->
             debug_msg("can't apply changes based on head_id from the future: ~p~n", [Message]),
@@ -224,9 +231,12 @@ cast_changes_to_client(State, ClientPid) ->
     gen_server:cast(ClientPid, get_changes_for_client(State, ClientPid)),
     ok.
 
-get_changes_for_client(State, ClientPid) ->
+get_last_seen_head_id_for_client(State, ClientPid) ->
     ClientInfo = maps:get(ClientPid, State#ledger_state.clients),
-    LSH = ClientInfo#client_info.last_seen_head,
+    ClientInfo#client_info.last_seen_head.
+
+get_changes_for_client(State, ClientPid) ->
+    LSH = get_last_seen_head_id_for_client(State, ClientPid),
     {ledger_changed, LSH, get_changes_since(LSH, State)}.
     
 get_changes_since(LastSeenHeadId, #ledger_state{head_id = HeadId, changes = Changes}) when LastSeenHeadId =< HeadId ->
