@@ -133,7 +133,19 @@ handle_cast({ch, Ch}, #client_state{local_state = LocalState, display_yx = YX} =
     EndState = State#client_state{local_state = NewLocalState},
     submit_local_changes(EndState),
     {noreply, EndState};
-handle_cast(_Request, State) ->
+handle_cast({local_changes_accepted, OldId, ChangeCount}, State) ->
+    #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState} = State,
+    LastSeenLedgerHead = LedgerHeadState#ledger_head_state.head_id, 
+    NewState = if
+        OldId =< LastSeenLedgerHead ->
+            merge_accepted_local_changes(State, ChangeCount - (LastSeenLedgerHead - OldId));
+        true ->
+            error(got_confirmation_of_too_new_changes)
+    end,
+    submit_local_changes(NewState),
+    {noreply, NewState};
+handle_cast(Request, State) ->
+    error({unrecognized_cast, Request}),
     {noreply, State}.
 
 send_char(Pid, Char) when is_integer(Char) ->
@@ -255,6 +267,15 @@ submit_local_changes(#client_state{ledger_head_state = LedgerHeadState, local_st
             ledgerServer:submit_local_changes(self(), LedgerHeadState#ledger_head_state.head_id, OldestToNewestChanges),
             ok
     end.
+
+merge_accepted_local_changes(State, ChangeCount) ->
+    #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState} = State,
+    Changes = lists:reverse(LocalState#local_state.changes), %now the changes are old to new
+    {ChangesAccepted, ChangesLeft} = lists:split(ChangeCount, Changes),
+    {ok, NewHeadText} = stringOps:apply_changes(LedgerHeadState#ledger_head_state.head_text, ChangesAccepted),
+    NewLedgerHeadId = LedgerHeadState#ledger_head_state.head_id + ChangeCount,
+    NewLedgerHeadState = LedgerHeadState#ledger_head_state{head_id = NewLedgerHeadId, head_text = NewHeadText},
+    State#client_state{local_state = LocalState#local_state{changes = lists:reverse(ChangesLeft)}, ledger_head_state = NewLedgerHeadState}.
 
 possible_names() ->
     ["Thomas", "James", "Jack", "Daniel", "Matthew", "Ryan", "Luke", "Samuel", "Jordan", "Adam", "Christopher", "Benjamin", "Joseph", "Liam", "William", "George", "Oliver", "Nathan", "Harry", "Kyle"].

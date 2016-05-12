@@ -11,7 +11,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 %% API
--export([insert_char/3, delete_char/2, split/2]).
+-export([insert_char/3, delete_char/2, split/2, is_a_change/1, apply_change/2, apply_changes/2]).
 
 delete_char(String, Position) ->
     lists:reverse(delete_character_1(String, Position, [])).
@@ -68,3 +68,31 @@ split_test_() -> [
     ?_assertEqual({"abcde", ""}, split(5, "abcde")),
     ?_assertEqual({"abcde", ""}, split(665, "abcde"))
 ].
+
+is_printable(Char) -> is_integer(Char) and (Char >= 32) and (Char =< 126).
+
+%changes {delete_char, Pos}, {insert_char, Pos, Char}
+is_a_change({delete_char, Pos}) when is_integer(Pos) -> true;
+is_a_change({insert_char, Pos, Char}) when is_integer(Pos), is_integer(Char), Char >= 32, Char =< 126 -> true;
+is_a_change(_) -> false.
+
+apply_change({delete_char, Pos}, Text) ->
+    PosIsCorrect = (Pos >= 0) and (Pos < string:len(Text)),
+    if
+        PosIsCorrect -> {ok, stringOps:delete_char(Text, Pos)};
+        true -> {fail, Text}
+    end;
+apply_change({insert_char, Pos, Char}, Text) ->
+    IsProperChar = is_printable(Char),
+    PosIsCorrect = (Pos >=0) and (Pos =< string:len(Text)),
+    if
+        IsProperChar, PosIsCorrect -> {ok, stringOps:insert_char(Text, Char, Pos)};
+        true -> {fail, Text}
+    end.
+
+apply_changes(Text, []) -> {ok, Text};
+apply_changes(Text, [H|T]) ->
+    case apply_change(H, Text) of
+        {ok, NewText} -> apply_changes(NewText, T);
+        Else -> Else
+    end.

@@ -118,13 +118,13 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
     #ledger_state{head_id = StateHeadId} = State,
     case BaseHeadId of
         StateHeadId -> 
-            case lists:all(fun is_a_change/1, NewChanges) of
+            case lists:all(fun stringOps:is_a_change/1, NewChanges) of
                 false ->
                     debug_msg("received broken changes", []),
                     {noreply, State}; 
                 true ->
                     debug_msg("received changes ~p", [Message]),
-                    case apply_changes(State#ledger_state.head_text, NewChanges) of
+                    case stringOps:apply_changes(State#ledger_state.head_text, NewChanges) of
                         {ok, NewText} -> 
                             #ledger_state{head_id = OldId, changes = OldChanges, clients = ClientsMap} = State,
                             % updating Sender's last seen head_id
@@ -213,34 +213,6 @@ get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
     #ledger_head_state{head_id = HeadId, head_text = Text}.
 
 get_client_pid({ClientPid, _Tag}) -> ClientPid.
-
-is_printable(Char) -> is_integer(Char) and (Char >= 32) and (Char =< 126).
-
-%changes {delete_char, Pos}, {insert_char, Pos, Char}
-is_a_change({delete_char, Pos}) when is_integer(Pos) -> true;
-is_a_change({insert_char, Pos, Char}) when is_integer(Pos), is_integer(Char), Char >= 32, Char =< 126 -> true;
-is_a_change(_) -> false.
-
-apply_change({delete_char, Pos}, Text) ->
-    PosIsCorrect = (Pos >= 0) and (Pos < string:len(Text)),
-    if
-        PosIsCorrect -> {ok, stringOps:delete_char(Text, Pos)};
-        true -> {fail, Text}
-    end;
-apply_change({insert_char, Pos, Char}, Text) ->
-    IsProperChar = is_printable(Char),
-    PosIsCorrect = (Pos >=0) and (Pos =< string:len(Text)),
-    if
-        IsProperChar, PosIsCorrect -> {ok, stringOps:insert_char(Text, Char, Pos)};
-        true -> {fail, Text}
-    end.
-
-apply_changes(Text, []) -> {ok, Text};
-apply_changes(Text, [H|T]) ->
-    case apply_change(H, Text) of
-        {ok, NewText} -> apply_changes(NewText, T);
-        Else -> Else
-    end.
 
 % yes, the casting changes to clients could be optimised by using the map more directly
 cast_changes_to_all_clients_except_for(State, ClientPid) ->
