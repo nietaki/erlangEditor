@@ -156,7 +156,16 @@ rebase_change_inner({insert_char, X, C} = _MasterChange, [{delete_char, Y}|T], A
 rebase_change_inner({delete_char, X} = MasterChange, [{insert_char, Y, C}|T], Acc) when X < Y ->
     rebase_change_inner(MasterChange, T, [{insert_char, Y - 1, C} | Acc]);
 rebase_change_inner({delete_char, X} = _MasterChange, [{insert_char, Y, C}|T], Acc) when X >= Y ->
-    rebase_change_inner({delete_char, X + 1}, T, [{insert_char, Y, C} | Acc]).
+    rebase_change_inner({delete_char, X + 1}, T, [{insert_char, Y, C} | Acc]);
+% both deletes - the tricky part ;)
+rebase_change_inner({delete_char, X} = MasterChange, [{delete_char, Y}|T], Acc) when X < Y ->
+    rebase_change_inner(MasterChange, T, [{delete_char, Y - 1} | Acc]);
+rebase_change_inner({delete_char, X} = _MasterChange, [{delete_char, Y}|T], Acc) when X > Y ->
+    rebase_change_inner({delete_char, X - 1}, T, [{delete_char, Y} | Acc]);
+rebase_change_inner({delete_char, X} = _MasterChange, [{delete_char, X}|T], Acc) ->
+    % both the master and the local changes want to delete the same character. Let's forget about it in the local changes
+    % and keep the rest of the local changes unmodified
+    lists:reverse(T) ++ Acc.
 
 rebase_testcase(InitialText, MasterChanges, LocalChanges, ExpectedResultingText) ->
     RebasedChanges = rebase_changes(MasterChanges, LocalChanges),
@@ -183,5 +192,11 @@ rebase_changes_test_() -> [
     fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 3, $X}], "acX") end,
     fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 1, $X}], "aXc") end,
     fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 0, $X}], "Xac") end,
+    % both deletes
+    fun () -> rebase_testcase("abc", [{delete_char, 0}], [{delete_char, 1}], "c") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{delete_char, 0}], "c") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{delete_char, 1}], "ac") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{delete_char, 1}, {delete_char, 1}], "a") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}, {delete_char, 1}], [{delete_char, 1}], "a") end,
     fun () -> rebase_testcase("removeme", [], [], "removeme") end
 ].
