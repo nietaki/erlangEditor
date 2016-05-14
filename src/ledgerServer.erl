@@ -225,6 +225,25 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+prune_change_history(#ledger_state{head_id = HeadId, clients = Clients, changes = Changes} = LedgerState) ->
+    HeadIdsSeenByClients = lists:map(fun (ClientInfo) -> ClientInfo#client_info.last_seen_head end, maps:values(Clients)),
+    SmallestClientHeadId = lists:foldl(fun min/2, HeadId, HeadIdsSeenByClients),
+    HowManyToKeep = HeadId - SmallestClientHeadId,
+    NewChanges = stringOps:get_last_elements(HowManyToKeep, Changes),
+    LedgerState#ledger_state{changes = NewChanges}.
+
+prune_change_history_test() ->
+    Clients = #{a => #client_info{last_seen_head = 3}, b => #client_info{last_seen_head = 4}},
+    Changes = [{delete_char, 1}, {delete_char, 2}, {delete_char, 3}, {delete_char, 4}, {delete_char, 5}],
+    State = #ledger_state{head_id = 7, head_text = "testtesttest", clients = Clients, changes = Changes},
+    % HEAD_ID 0   1   3   4   5   6   7
+    % change          d1  d2  d3  d4  d5
+    %                     ^- this is the first change we need, all clients saw 3
+    PrunedState = prune_change_history(State),
+    ?assertEqual([{delete_char, 2}, {delete_char, 3}, {delete_char, 4}, {delete_char, 5}], PrunedState#ledger_state.changes),
+    % the rest of the state should remain unchanged
+    ?assertEqual(State#ledger_state{changes = []}, PrunedState#ledger_state{changes = []}). 
+    
 get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
     #ledger_head_state{head_id = HeadId, head_text = Text}.
 

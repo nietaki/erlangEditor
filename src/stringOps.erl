@@ -15,6 +15,7 @@
 -export([insert_char/3, delete_char/2, split/2, is_a_change/1, apply_change/2, apply_changes_verbose/2, apply_changes/2]).
 -export([apply_change_to_position/2, apply_changes_to_position/2]).
 -export([rebase_changes/2]).
+-export([get_last_elements/2]).
 
 delete_char(String, Position) ->
     lists:reverse(delete_character_1(String, Position, [])).
@@ -215,4 +216,14 @@ rebase_changes_test_() -> [
     fun () -> rebase_testcase("abc", [{insert_char, 1, $d}, {delete_char, 2}], [{delete_char, 1}], "adc") end,
     fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 1, $e}, {delete_char, 2}], "aec") end,
     fun () -> rebase_testcase("convenience", [], [], "convenience") end
+].
+
+get_last_elements(ElementCount, List) ->
+    ListLength = length(List),
+    lists:nthtail(ListLength - ElementCount, List).
+
+get_last_elements_test_() -> [
+    ?_assertEqual([b, c], get_last_elements(2, [a, b, c])),
+    ?_assertEqual([], get_last_elements(0, [a, b, c])),
+    ?_assertEqual([a, b, c], get_last_elements(3, [a, b, c]))
 ].
