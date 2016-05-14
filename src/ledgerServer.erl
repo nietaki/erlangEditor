@@ -90,8 +90,10 @@ handle_call({register, Username}, From, State) ->
     #ledger_state{head_id = HeadId, clients = Clients} = State,
     NewClientState = #client_info{username = Username, last_seen_head = HeadId},
     NewClients = Clients#{get_client_pid(From) => NewClientState},
+    monitor(process, get_client_pid(From)),
     debug_msg("client ~s joined as pid ~p", [Username, From]),
     {reply, get_ledger_state_message(State), State#ledger_state{clients = NewClients}};
+
 handle_call(get_state, _From, State) ->
     {reply, State, State};
 handle_call(_Request, _From, State) ->
@@ -179,7 +181,14 @@ submit_local_changes(Pid, BaseHeadId, NewChanges) ->
     {noreply, NewState :: #ledger_state{}} |
     {noreply, NewState :: #ledger_state{}, timeout() | hibernate} |
     {stop, Reason :: term(), NewState :: #ledger_state{}}).
-handle_info(_Info, State) ->
+handle_info({'DOWN', _Ref, process, Pid, _Why} = MonitorMessage, State) ->
+    debug_msg("unregistering client ~p because of ~p", [Pid, MonitorMessage]),
+    NewClients = maps:remove(Pid, State#ledger_state.clients),
+    NewState = State#ledger_state{clients = NewClients},
+    debug_msg("new state: ~p", [NewState]),
+    {noreply, NewState};
+handle_info(Info, State) ->
+    debug_msg("info: ~p", [Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
