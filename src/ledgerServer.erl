@@ -124,7 +124,7 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                     {noreply, State}; 
                 true ->
                     debug_msg("received changes ~p", [Message]),
-                    case stringOps:apply_changes(State#ledger_state.head_text, NewChanges) of
+                    case stringOps:apply_changes_verbose(State#ledger_state.head_text, NewChanges) of
                         {ok, NewText} -> 
                             #ledger_state{head_id = OldId, changes = OldChanges, clients = ClientsMap} = State,
                             % updating Sender's last seen head_id

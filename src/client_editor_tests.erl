@@ -83,6 +83,7 @@ a_client_gets_other_clients_changes(_ServerPid) ->
         A = spawn_client(a),
         B = spawn_client(b),
         client_editor:send_char(A, $a),
+        timer:sleep(10),
         AState = client_editor:debug_get_state(A),
         BState = client_editor:debug_get_state(B), 
         

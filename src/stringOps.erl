@@ -12,7 +12,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% API
--export([insert_char/3, delete_char/2, split/2, is_a_change/1, apply_change/2, apply_changes/2]).
+-export([insert_char/3, delete_char/2, split/2, is_a_change/1, apply_change/2, apply_changes_verbose/2, apply_changes/2]).
 -export([apply_change_to_position/2, apply_changes_to_position/2]).
 -export([rebase_changes/2]).
 
@@ -93,12 +93,16 @@ apply_change({insert_char, Pos, Char}, Text) ->
         true -> {fail, Text}
     end.
 
-apply_changes(Text, []) -> {ok, Text};
-apply_changes(Text, [H|T]) ->
+apply_changes_verbose(Text, []) -> {ok, Text};
+apply_changes_verbose(Text, [H|T]) ->
     case apply_change(H, Text) of
-        {ok, NewText} -> apply_changes(NewText, T);
+        {ok, NewText} -> apply_changes_verbose(NewText, T);
         Else -> Else
     end.
+
+apply_changes(Text, Changes) ->
+    {ok, NewText} = apply_changes_verbose(Text, Changes),
+    NewText.
 
 % moves the position of something in the text to where it will be after the change is applied to the text
 apply_change_to_position({insert_char, ChangePos, _Char}, Position) when ChangePos =< Position -> Position + 1;
@@ -171,8 +175,8 @@ rebase_change_inner({delete_char, X} = _MasterChange, [{delete_char, X}|T], Acc)
 
 rebase_testcase(InitialText, MasterChanges, LocalChanges, ExpectedResultingText) ->
     RebasedChanges = rebase_changes(MasterChanges, LocalChanges),
-    {ok, AfterMaster} = apply_changes(InitialText, MasterChanges),
-    {ok, ResultingText} = apply_changes(AfterMaster, RebasedChanges),
+    {ok, AfterMaster} = apply_changes_verbose(InitialText, MasterChanges),
+    {ok, ResultingText} = apply_changes_verbose(AfterMaster, RebasedChanges),
     ?assertEqual(ExpectedResultingText, ResultingText).
 
 rebase_changes_test_() -> [

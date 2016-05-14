@@ -147,6 +147,23 @@ handle_cast({local_changes_accepted, OldId, ChangeCount}, State) ->
     end,
     submit_local_changes(NewState),
     {noreply, NewState};
+handle_cast({ledger_changed, BaseHeadId, ChangesSinceBaseHeadId}, State) when State#client_state.ledger_head_state#ledger_head_state.head_id =:= BaseHeadId ->
+    LocalState = State#client_state.local_state,
+    LedgerHeadState = State#client_state.ledger_head_state,
+    PreviousLedgerHeadText = LedgerHeadState#ledger_head_state.head_text,
+    NewLedgerHeadText = stringOps:apply_changes(PreviousLedgerHeadText, ChangesSinceBaseHeadId),
+    LocalChangesPlusCursorPosition = [{insert_char, LocalState#local_state.cursor_position, $*} | LocalState#local_state.changes],
+    CursorPositionPlusRebasedReverseChronologicalLocalChanges = lists:reverse(stringOps:rebase_changes(ChangesSinceBaseHeadId, lists:reverse(LocalChangesPlusCursorPosition))),
+    NewLedgerHeadState = LedgerHeadState#ledger_head_state{head_id = BaseHeadId + length(ChangesSinceBaseHeadId), head_text = NewLedgerHeadText},
+    [{insert_char, NewCursorPosition, $*}| ReverseChronologicalLocalChanges] = CursorPositionPlusRebasedReverseChronologicalLocalChanges,
+    NewResultingText = stringOps:apply_changes(NewLedgerHeadText, lists:reverse(ReverseChronologicalLocalChanges)),
+    NewLocalState = LocalState#local_state{changes = ReverseChronologicalLocalChanges, cursor_position = NewCursorPosition, resulting_text = NewResultingText},
+    FinalState = State#client_state{local_state = NewLocalState, ledger_head_state = NewLedgerHeadState}, 
+    submit_local_changes(FinalState),
+    {noreply, FinalState};
+handle_cast({ledger_changed, _BaseHeadId, _ChangesSinceBaseHeadId} = Request, State) ->
+    error({got_ledger_changed_message_for_a_wrong_base_head_id, Request}),
+    {noreply, State};
 handle_cast(Request, State) ->
     error({unrecognized_cast, Request}),
     {noreply, State}.
@@ -261,7 +278,7 @@ get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     end,
     min(max(0, NewPosition), ConsoleHeight * ConsoleWidth - 1).
 
-submit_local_changes(#client_state{ledger_head_state = LedgerHeadState, local_state = LocalState}) ->
+submit_local_changes(#client_state{ledger_head_state = LedgerHeadState, local_state = LocalState} = _ClientState) ->
     LocalChanges = LocalState#local_state.changes,
     case LocalChanges of
         [] -> ok;
@@ -275,7 +292,7 @@ merge_accepted_local_changes(State, ChangeCount) ->
     #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState} = State,
     Changes = lists:reverse(LocalState#local_state.changes), %now the changes are old to new
     {ChangesAccepted, ChangesLeft} = lists:split(ChangeCount, Changes),
-    {ok, NewHeadText} = stringOps:apply_changes(LedgerHeadState#ledger_head_state.head_text, ChangesAccepted),
+    NewHeadText = stringOps:apply_changes(LedgerHeadState#ledger_head_state.head_text, ChangesAccepted),
     NewLedgerHeadId = LedgerHeadState#ledger_head_state.head_id + ChangeCount,
     NewLedgerHeadState = LedgerHeadState#ledger_head_state{head_id = NewLedgerHeadId, head_text = NewHeadText},
     State#client_state{local_state = LocalState#local_state{changes = lists:reverse(ChangesLeft)}, ledger_head_state = NewLedgerHeadState}.
