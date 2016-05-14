@@ -81,8 +81,7 @@ init([DisplayInitFun, DisplayRepaintFun]) ->
             {ok, DisplayYX} = DisplayInitFun(self()),
             LocalState = #local_state{ cursor_position = length(Text), resulting_text = Text},
             State = #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState, display_repaint_fun = DisplayRepaintFun, display_yx = DisplayYX},
-            Repaint = State#client_state.display_repaint_fun,
-            ok = Repaint(LocalState),
+            repaint(State),
             {ok, State};
         SomethingElse ->
             io:format("could not register~n"),
@@ -131,9 +130,8 @@ handle_cast({ch, ?ceKEY_ESC}, State) ->
     {stop, user_pressed_esc, State};
 handle_cast({ch, Ch}, #client_state{local_state = LocalState, display_yx = YX} = State) ->
     NewLocalState = handle_char(LocalState, YX, Ch),
-    RepaintFun = State#client_state.display_repaint_fun,
-    RepaintFun(NewLocalState),
     EndState = State#client_state{local_state = NewLocalState},
+    repaint(EndState),
     submit_local_changes(EndState),
     {noreply, EndState};
 handle_cast({local_changes_accepted, OldId, ChangeCount}, State) ->
@@ -147,22 +145,15 @@ handle_cast({local_changes_accepted, OldId, ChangeCount}, State) ->
     end,
     submit_local_changes(NewState),
     {noreply, NewState};
-handle_cast({ledger_changed, BaseHeadId, ChangesSinceBaseHeadId}, State) when State#client_state.ledger_head_state#ledger_head_state.head_id =:= BaseHeadId ->
-    LocalState = State#client_state.local_state,
-    LedgerHeadState = State#client_state.ledger_head_state,
-    PreviousLedgerHeadText = LedgerHeadState#ledger_head_state.head_text,
-    NewLedgerHeadText = stringOps:apply_changes(PreviousLedgerHeadText, ChangesSinceBaseHeadId),
-    LocalChangesPlusCursorPosition = [{insert_char, LocalState#local_state.cursor_position, $*} | LocalState#local_state.changes],
-    CursorPositionPlusRebasedReverseChronologicalLocalChanges = lists:reverse(stringOps:rebase_changes(ChangesSinceBaseHeadId, lists:reverse(LocalChangesPlusCursorPosition))),
-    NewLedgerHeadState = LedgerHeadState#ledger_head_state{head_id = BaseHeadId + length(ChangesSinceBaseHeadId), head_text = NewLedgerHeadText},
-    [{insert_char, NewCursorPosition, $*}| ReverseChronologicalLocalChanges] = CursorPositionPlusRebasedReverseChronologicalLocalChanges,
-    NewResultingText = stringOps:apply_changes(NewLedgerHeadText, lists:reverse(ReverseChronologicalLocalChanges)),
-    NewLocalState = LocalState#local_state{changes = ReverseChronologicalLocalChanges, cursor_position = NewCursorPosition, resulting_text = NewResultingText},
-    FinalState = State#client_state{local_state = NewLocalState, ledger_head_state = NewLedgerHeadState}, 
-    submit_local_changes(FinalState),
+handle_cast({ledger_changed, BaseHeadId, ChangesSinceBaseHeadId}, State) when BaseHeadId =< State#client_state.ledger_head_state#ledger_head_state.head_id ->
+    LastHeadIdSeenByTheClient = State#client_state.ledger_head_state#ledger_head_state.head_id,
+    CountOfChangesToDrop = LastHeadIdSeenByTheClient - BaseHeadId,
+    {_DiscardedChanges, RelevantChanges} = lists:split(CountOfChangesToDrop, ChangesSinceBaseHeadId),
+    FinalState = handle_ledger_change(RelevantChanges, State),
+    repaint(FinalState),
     {noreply, FinalState};
 handle_cast({ledger_changed, _BaseHeadId, _ChangesSinceBaseHeadId} = Request, State) ->
-    %error({got_ledger_changed_message_for_a_wrong_base_head_id, Request}),
+    error({got_ledger_changed_message_for_a_wrong_base_head_id, Request}),
     {noreply, State};
 handle_cast(Request, State) ->
     error({unrecognized_cast, Request}),
@@ -228,6 +219,27 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+repaint(ClientState) ->
+    RepaintFun = ClientState#client_state.display_repaint_fun,
+    RepaintFun(ClientState#client_state.local_state).
+
+handle_ledger_change(ChangesSinceBaseHeadId, State) ->
+    LocalState = State#client_state.local_state,
+    LedgerHeadState = State#client_state.ledger_head_state,
+    BaseHeadId = LedgerHeadState#ledger_head_state.head_id,
+    PreviousLedgerHeadText = LedgerHeadState#ledger_head_state.head_text,
+    NewLedgerHeadText = stringOps:apply_changes(PreviousLedgerHeadText, ChangesSinceBaseHeadId),
+    LocalChangesPlusCursorPosition = [{insert_char, LocalState#local_state.cursor_position, $*} | LocalState#local_state.changes],
+    CursorPositionPlusRebasedReverseChronologicalLocalChanges = lists:reverse(stringOps:rebase_changes(ChangesSinceBaseHeadId, lists:reverse(LocalChangesPlusCursorPosition))),
+    NewLedgerHeadState = LedgerHeadState#ledger_head_state{head_id = BaseHeadId + length(ChangesSinceBaseHeadId), head_text = NewLedgerHeadText},
+    [{insert_char, NewCursorPosition, $*}| ReverseChronologicalLocalChanges] = CursorPositionPlusRebasedReverseChronologicalLocalChanges,
+    NewResultingText = stringOps:apply_changes(NewLedgerHeadText, lists:reverse(ReverseChronologicalLocalChanges)),
+    NewLocalState = LocalState#local_state{changes = ReverseChronologicalLocalChanges, cursor_position = NewCursorPosition, resulting_text = NewResultingText},
+    FinalState = State#client_state{local_state = NewLocalState, ledger_head_state = NewLedgerHeadState}, 
+    
+    submit_local_changes(FinalState),
+    FinalState.
 
 -spec(handle_char(LocalState :: #local_state{}, YX :: {integer(), integer()}, Ch ::char()) -> #client_state{}).
 handle_char(LocalState, YX, Ch) ->
