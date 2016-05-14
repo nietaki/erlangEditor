@@ -129,7 +129,7 @@ apply_changes_to_position_test_() -> [
     ?_assertEqual(6, apply_changes_to_position([{insert_char, 0, $x}, {insert_char, 0, $x}, {insert_char, 4, $x}], 3))
 ].
 
-%UP NEXT: rebase_changes(MasterChanges, LocalChanges) -> RebasedLocalChanges
+%MAIN ATTRACTION: rebase_changes(MasterChanges, LocalChanges) -> RebasedLocalChanges
 rebase_changes([] = _RemoteChanges, LocalChanges) -> LocalChanges;
 rebase_changes([H|T], LocalChanges) -> rebase_changes(T, rebase_change(H, LocalChanges)).
 
@@ -140,9 +140,18 @@ rebase_change(MasterChange, LocalChanges) ->
 
 % MasterChange will be "projected" as the execution goes through the remaining changes
 %rebase_change_inner(MasterChange, RemainingLocalChanges, Acc) ->
+% base case
 rebase_change_inner(_ProjectedMasterChange, [], Acc) -> Acc;
+% both inserts
 rebase_change_inner({insert_char, X, _} = MasterChange, [{insert_char, Y, YChar}|T], Acc) when X =< Y ->
-    rebase_change_inner(MasterChange, T, [{insert_char, Y + 1, YChar} | Acc]).
+    rebase_change_inner(MasterChange, T, [{insert_char, Y + 1, YChar} | Acc]);
+rebase_change_inner({insert_char, X, C} = _MasterChange, [{insert_char, Y, YChar}|T], Acc) when X > Y ->
+    rebase_change_inner({insert_char, X + 1, C}, T, [{insert_char, Y, YChar} | Acc]);
+% right delete
+rebase_change_inner({insert_char, X, _} = MasterChange, [{delete_char, Y}|T], Acc) when X =< Y ->
+    rebase_change_inner(MasterChange, T, [{delete_char, Y + 1} | Acc]);
+rebase_change_inner({insert_char, X, C} = _MasterChange, [{delete_char, Y}|T], Acc) when X > Y ->
+    rebase_change_inner({insert_char, X - 1, C}, T, [{delete_char, Y} | Acc]).
 
 rebase_testcase(InitialText, MasterChanges, LocalChanges, ExpectedResultingText) ->
     RebasedChanges = rebase_changes(MasterChanges, LocalChanges),
@@ -153,5 +162,16 @@ rebase_testcase(InitialText, MasterChanges, LocalChanges, ExpectedResultingText)
 rebase_changes_test_() -> [
     fun () -> rebase_testcase("foo", [], [], "foo") end,
     fun () -> rebase_testcase("foo", [], [{insert_char, 3, $l}], "fool") end,
-    fun () -> rebase_testcase("foo", [{insert_char, 2, $d}], [{insert_char, 3, $l}], "fodol") end
+    fun () -> rebase_testcase("foo", [{insert_char, 2, $d}], [{insert_char, 3, $l}], "fodol") end,
+    fun () -> rebase_testcase("foo", [{insert_char, 3, $d}], [{insert_char, 2, $l}], "folod") end,
+    fun () -> rebase_testcase("foo", [{insert_char, 3, $d}], [{insert_char, 3, $y}, {insert_char, 2, $x}], "foxody") end,
+    % multiple changes in master
+    fun () -> rebase_testcase("abc", [{insert_char, 3, $Y},{insert_char, 0, $X}], [{insert_char, 1, $x}], "XaxbcY") end,
+    % deletes on the right side
+    fun () -> rebase_testcase("abc", [{insert_char, 0, $X}], [{delete_char, 2}], "Xab") end,
+    fun () -> rebase_testcase("abc", [{insert_char, 1, $X}], [{delete_char, 1}], "aXc") end,
+    fun () -> rebase_testcase("abc", [{insert_char, 3, $X}], [{delete_char, 1}], "acX") end,
+    fun () -> rebase_testcase("abc", [{insert_char, 2, $X}], [{delete_char, 1}, {insert_char, 2, $y}], "aXcy") end,
+    fun () -> rebase_testcase("abc", [{insert_char, 2, $X}], [{delete_char, 1}, {insert_char, 1, $y}], "aXyc") end,
+    fun () -> rebase_testcase("removeme", [], [], "removeme") end
 ].
