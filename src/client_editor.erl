@@ -314,5 +314,5 @@ possible_names() ->
 
 random_name() ->
     Names = possible_names(),
-    Idx = random:uniform(length(Names)),
+    Idx = rand:uniform(length(Names)),
     lists:nth(Idx, Names).
