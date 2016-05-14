@@ -162,7 +162,7 @@ handle_cast({ledger_changed, BaseHeadId, ChangesSinceBaseHeadId}, State) when St
     submit_local_changes(FinalState),
     {noreply, FinalState};
 handle_cast({ledger_changed, _BaseHeadId, _ChangesSinceBaseHeadId} = Request, State) ->
-    error({got_ledger_changed_message_for_a_wrong_base_head_id, Request}),
+    %error({got_ledger_changed_message_for_a_wrong_base_head_id, Request}),
     {noreply, State};
 handle_cast(Request, State) ->
     error({unrecognized_cast, Request}),

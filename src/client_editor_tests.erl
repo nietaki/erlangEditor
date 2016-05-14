@@ -21,7 +21,8 @@ client_editor_test_() ->
         fun client_sends_a_letter_to_the_server_and_gets_its_changes_accepted/1,
         fun client_works_with_two_separate_changes/1,
         fun client_works_with_two_changes_one_after_another/1,
-        fun a_client_gets_other_clients_changes/1
+        fun a_client_gets_other_clients_changes/1,
+        fun changes_of_two_clients_get_merged/1
     ]}.
 
 client_connects_to_server(ServerPid) ->
@@ -92,10 +93,34 @@ a_client_gets_other_clients_changes(_ServerPid) ->
         % client's changes should already be accepted
         ?assertMatch(#ledger_head_state{head_id = 1, head_text = "a"}, AState#client_state.ledger_head_state),
         ?assertMatch(#ledger_head_state{head_id = 1, head_text = "a"}, BState#client_state.ledger_head_state),
+        ?assertMatch(#local_state{changes = [], cursor_position = 1, resulting_text = "a"}, AState#client_state.local_state),
+        ?assertMatch(#local_state{changes = [], cursor_position = 1, resulting_text = "a"}, BState#client_state.local_state),
         kill_client(A),
         kill_client(B)
     end.
 
+changes_of_two_clients_get_merged(_ServerPid) ->
+    fun() ->
+        A = spawn_client(a),
+        B = spawn_client(b),
+        client_editor:send_char(A, $X),
+        client_editor:send_keystroke(A, left),
+        timer:sleep(10),
+        client_editor:send_char(A, $a),
+        client_editor:send_char(B, $b),
+        timer:sleep(90),
+        
+        AState = client_editor:debug_get_state(A),
+        BState = client_editor:debug_get_state(B), 
+        
+        ?assertMatch(#ledger_state{head_id = 3, head_text = "aXb"}, ledgerServer:debug_get_state()),
+        
+        % client's changes should already be accepted
+        %?assertMatch(#ledger_head_state{head_id = 1, head_text = "a"}, AState#client_state.ledger_head_state),
+        %?assertMatch(#ledger_head_state{head_id = 1, head_text = "a"}, BState#client_state.ledger_head_state),
+        kill_client(A),
+        kill_client(B)
+    end.
 
 % util functions
 spawn_client() -> spawn_client(client_editor).
