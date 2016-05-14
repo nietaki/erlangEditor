@@ -130,3 +130,28 @@ apply_changes_to_position_test_() -> [
 ].
 
 %UP NEXT: rebase_changes(MasterChanges, LocalChanges) -> RebasedLocalChanges
+rebase_changes([] = _RemoteChanges, LocalChanges) -> LocalChanges;
+rebase_changes([H|T], LocalChanges) -> rebase_changes(T, rebase_change(H, LocalChanges)).
+
+%rebase_change(RemoteChange, LocalChanges) -> [NewChange].
+rebase_change(MasterChange, LocalChanges) ->
+    ReversedResult = rebase_change_inner(MasterChange, LocalChanges, []),
+    lists:reverse(ReversedResult).
+
+% MasterChange will be "projected" as the execution goes through the remaining changes
+%rebase_change_inner(MasterChange, RemainingLocalChanges, Acc) ->
+rebase_change_inner(_ProjectedMasterChange, [], Acc) -> Acc;
+rebase_change_inner({insert_char, X, _} = MasterChange, [{insert_char, Y, YChar}|T], Acc) when X =< Y ->
+    rebase_change_inner(MasterChange, T, [{insert_char, Y + 1, YChar} | Acc]).
+
+rebase_testcase(InitialText, MasterChanges, LocalChanges, ExpectedResultingText) ->
+    RebasedChanges = rebase_changes(MasterChanges, LocalChanges),
+    {ok, AfterMaster} = apply_changes(InitialText, MasterChanges),
+    {ok, ResultingText} = apply_changes(AfterMaster, RebasedChanges),
+    ?assertEqual(ExpectedResultingText, ResultingText).
+
+rebase_changes_test_() -> [
+    fun () -> rebase_testcase("foo", [], [], "foo") end,
+    fun () -> rebase_testcase("foo", [], [{insert_char, 3, $l}], "fool") end,
+    fun () -> rebase_testcase("foo", [{insert_char, 2, $d}], [{insert_char, 3, $l}], "fodol") end
+].
