@@ -151,7 +151,12 @@ rebase_change_inner({insert_char, X, C} = _MasterChange, [{insert_char, Y, YChar
 rebase_change_inner({insert_char, X, _} = MasterChange, [{delete_char, Y}|T], Acc) when X =< Y ->
     rebase_change_inner(MasterChange, T, [{delete_char, Y + 1} | Acc]);
 rebase_change_inner({insert_char, X, C} = _MasterChange, [{delete_char, Y}|T], Acc) when X > Y ->
-    rebase_change_inner({insert_char, X - 1, C}, T, [{delete_char, Y} | Acc]).
+    rebase_change_inner({insert_char, X - 1, C}, T, [{delete_char, Y} | Acc]);
+% left delete
+rebase_change_inner({delete_char, X} = MasterChange, [{insert_char, Y, C}|T], Acc) when X < Y ->
+    rebase_change_inner(MasterChange, T, [{insert_char, Y - 1, C} | Acc]);
+rebase_change_inner({delete_char, X} = _MasterChange, [{insert_char, Y, C}|T], Acc) when X >= Y ->
+    rebase_change_inner({delete_char, X + 1}, T, [{insert_char, Y, C} | Acc]).
 
 rebase_testcase(InitialText, MasterChanges, LocalChanges, ExpectedResultingText) ->
     RebasedChanges = rebase_changes(MasterChanges, LocalChanges),
@@ -173,5 +178,10 @@ rebase_changes_test_() -> [
     fun () -> rebase_testcase("abc", [{insert_char, 3, $X}], [{delete_char, 1}], "acX") end,
     fun () -> rebase_testcase("abc", [{insert_char, 2, $X}], [{delete_char, 1}, {insert_char, 2, $y}], "aXcy") end,
     fun () -> rebase_testcase("abc", [{insert_char, 2, $X}], [{delete_char, 1}, {insert_char, 1, $y}], "aXyc") end,
+    % deletes on the left side
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 2, $X}], "aXc") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 3, $X}], "acX") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 1, $X}], "aXc") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 0, $X}], "Xac") end,
     fun () -> rebase_testcase("removeme", [], [], "removeme") end
 ].
