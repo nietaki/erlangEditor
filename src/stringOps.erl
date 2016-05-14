@@ -10,9 +10,11 @@
 -author("nietaki").
 
 -include_lib("eunit/include/eunit.hrl").
+
 %% API
 -export([insert_char/3, delete_char/2, split/2, is_a_change/1, apply_change/2, apply_changes/2]).
 -export([apply_change_to_position/2, apply_changes_to_position/2]).
+-export([rebase_changes/2]).
 
 delete_char(String, Position) ->
     lists:reverse(delete_character_1(String, Position, [])).
@@ -198,5 +200,15 @@ rebase_changes_test_() -> [
     fun () -> rebase_testcase("abc", [{delete_char, 1}], [{delete_char, 1}], "ac") end,
     fun () -> rebase_testcase("abc", [{delete_char, 1}], [{delete_char, 1}, {delete_char, 1}], "a") end,
     fun () -> rebase_testcase("abc", [{delete_char, 1}, {delete_char, 1}], [{delete_char, 1}], "a") end,
-    fun () -> rebase_testcase("removeme", [], [], "removeme") end
+    % exploratory tests
+    fun () -> rebase_testcase("", [{insert_char, 0, $F}, {insert_char, 1, $r}], [{insert_char, 0, $J}, {insert_char, 1, $a}], "FrJa") end,
+    fun () -> rebase_testcase("abcde", [{delete_char, 1}, {delete_char, 1}], [{delete_char, 2}, {delete_char, 2}], "ae") end,
+    fun () -> rebase_testcase("ab", [{delete_char, 0}, {delete_char, 0}], [{delete_char, 1}, {delete_char, 0}], "") end,
+    fun () -> rebase_testcase("XabY", [{delete_char, 1}, {delete_char, 1}], [{delete_char, 2}, {delete_char, 1}], "XY") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}, {insert_char, 1, $d}], [{delete_char, 1}], "adc") end,
+    fun () -> rebase_testcase("abc", [{insert_char, 1, $d}, {delete_char, 1}], [{delete_char, 1}], "ac") end,
+    fun () -> rebase_testcase("abc", [{insert_char, 1, $d}, {delete_char, 2}, {delete_char, 1}], [{delete_char, 1}], "ac") end,
+    fun () -> rebase_testcase("abc", [{insert_char, 1, $d}, {delete_char, 2}], [{delete_char, 1}], "adc") end,
+    fun () -> rebase_testcase("abc", [{delete_char, 1}], [{insert_char, 1, $e}, {delete_char, 2}], "aec") end,
+    fun () -> rebase_testcase("convenience", [], [], "convenience") end
 ].

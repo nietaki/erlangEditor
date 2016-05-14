@@ -20,8 +20,8 @@ client_editor_test_() ->
         fun client_connects_to_server/1,
         fun client_sends_a_letter_to_the_server_and_gets_its_changes_accepted/1,
         fun client_works_with_two_separate_changes/1,
-        fun client_works_with_two_changes_one_after_another/1
-        %fun a_client_gets_ther_clients_changes/1
+        fun client_works_with_two_changes_one_after_another/1,
+        fun a_client_gets_other_clients_changes/1
     ]}.
 
 client_connects_to_server(ServerPid) ->
@@ -78,7 +78,7 @@ client_works_with_two_changes_one_after_another(_ServerPid) ->
         kill_client(ClientPid)
     end.
 
-a_client_gets_ther_clients_changes(_ServerPid) ->
+a_client_gets_other_clients_changes(_ServerPid) ->
     fun() ->
         A = spawn_client(a),
         B = spawn_client(b),
