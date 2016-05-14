@@ -93,7 +93,6 @@ handle_call({register, Username}, From, State) ->
     monitor(process, get_client_pid(From)),
     debug_msg("client ~s joined as pid ~p", [Username, From]),
     {reply, get_ledger_state_message(State), State#ledger_state{clients = NewClients}};
-
 handle_call(get_state, _From, State) ->
     {reply, State, State};
 handle_call(_Request, _From, State) ->
@@ -136,7 +135,8 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                             NewClientsMap = ClientsMap#{Sender := NewClientInfo},
                             
                             gen_server:cast(Sender, {local_changes_accepted, OldId, length(NewChanges)}),
-                            StateWithAppliedChanges = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
+                            StateWithAppliedChanges1 = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
+                            StateWithAppliedChanges = prune_change_history(StateWithAppliedChanges1),
                             cast_changes_to_all_clients_except_for(StateWithAppliedChanges, Sender),
                             debug_msg("changes applied", []),
                             debug_msg("new state: ~p", [StateWithAppliedChanges]),

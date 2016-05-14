@@ -41,7 +41,7 @@ server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
     fun() ->
         ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
-        ?assertMatch(#ledger_state{head_id = 1, head_text = "x", clients= _Clients, changes=[{insert_char, 0, $x}]}, ledgerServer:debug_get_state()),
+        ?assertMatch(#ledger_state{head_id = 1, head_text = "x", clients= _Clients}, ledgerServer:debug_get_state()),
         test_utils:expect_cast({local_changes_accepted,0,1}),
         test_utils:expect_no_cast()
     end.
@@ -50,7 +50,7 @@ server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
     fun() ->
         ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}, {insert_char, 1, $y}]),
-        ?assertMatch(#ledger_state{head_id=2, head_text="xy", clients=_Clients, changes=[{insert_char, 0, $x}, {insert_char, 1, $y}]}, ledgerServer:debug_get_state()),
+        ?assertMatch(#ledger_state{head_id=2, head_text="xy", clients=_Clients}, ledgerServer:debug_get_state()),
         test_utils:expect_cast({local_changes_accepted,0,2}) 
     end.
 
