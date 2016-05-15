@@ -19,7 +19,7 @@
 -record(client_state, {
     ledger_head_state = #ledger_head_state{},
     local_state = #local_state{},
-    cursor_positions = #{tmp => {"Xavery", 0}},
+    cursor_positions = #{},
     %display stuff
     display_repaint_fun,
     display_yx

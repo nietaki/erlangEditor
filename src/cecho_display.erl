@@ -63,7 +63,6 @@ render_lines(StartingLineNumber, [H|T]) ->
     cecho:mvaddstr(StartingLineNumber, 0, H),
     render_lines(StartingLineNumber + 1, T).
 
-
 -spec(split_into_lines(LineLength :: integer(), Text :: list()) -> [list()]).
 split_into_lines(LineLength, Text) ->
     lists:reverse(split_into_lines_1(LineLength, Text, [])).

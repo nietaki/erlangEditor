@@ -127,7 +127,7 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                     debug_msg("received changes ~p", [Message]),
                     case stringOps:apply_changes_verbose(State#ledger_state.head_text, NewChanges) of
                         {ok, NewText} -> 
-                            LastChangePosition = stringOps:change_position(lists:last(NewChanges)),
+                            LastChangePosition = stringOps:cursor_position(lists:last(NewChanges)),
                             #ledger_state{head_id = OldId, changes = OldChanges, clients = ClientsMap} = State,
                             % updating Sender's last seen head_id
                             NewId = OldId + length(NewChanges),
@@ -167,7 +167,9 @@ handle_cast({ledger_seen, Who, HeadId, CursorPosition}, #ledger_state{clients = 
     NewClientsMap1 = update_clients_seen_head_id(ClientsMap, Who, HeadId),
     NewClientsMap = update_clients_cursor_position(NewClientsMap1, Who, CursorPosition),
     debug_msg("the clients map is: ~p", [NewClientsMap]),
-    {noreply, prune_change_history(State#ledger_state{clients = NewClientsMap})};
+    NewState = prune_change_history(State#ledger_state{clients = NewClientsMap}),
+    cast_cursor_positions_to_all_clients(NewState),
+    {noreply, NewState};
 handle_cast(_Request, State) ->
     {noreply, State}.
 
@@ -279,10 +281,14 @@ cast_changes_to_all_clients_except_for(State, ClientPid) ->
     ClientListFiltered = lists:filter(fun(C) -> C =/= ClientPid end, ClientList),
     lists:map(fun(C) -> cast_changes_to_client(State, C) end, ClientListFiltered).
 
-cast_cursor_positions_to_all_clients(#ledger_state{clients = Clients, head_id = HeadId}) ->
+get_cursor_positions_for_head_id_map(#ledger_state{clients = Clients, head_id = HeadId}) ->
     ClientsAtHead = maps:filter(fun (_, V) -> V#client_info.last_seen_head =:= HeadId end, Clients),
-    PidToTupleMap = maps:map(fun (_, #client_info{username = Username, cursor_position = CursorPosition}) -> {Username, CursorPosition} end, ClientsAtHead),
+    maps:map(fun (_, #client_info{username = Username, cursor_position = CursorPosition}) -> {Username, CursorPosition} end, ClientsAtHead).
+    
+cast_cursor_positions_to_all_clients(#ledger_state{clients = Clients, head_id = HeadId} = State) ->
+    PidToTupleMap = get_cursor_positions_for_head_id_map(State), 
     ClientPids = maps:keys(Clients),
+    debug_msg("sending client positions: ~p to clients ~p", [PidToTupleMap, ClientPids]),
     lists:map(fun(C) -> cast_cursor_positions_to_client(PidToTupleMap, HeadId, C) end, ClientPids).
 
 % PositionsMap should be a map like #{ Pid -> {Username, CursorPosition} }, only for clients at head
