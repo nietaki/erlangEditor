@@ -92,7 +92,9 @@ handle_call({register, Username}, From, State) ->
     NewClients = Clients#{get_client_pid(From) => NewClientState},
     monitor(process, get_client_pid(From)),
     debug_msg("client ~s joined as pid ~p", [Username, From]),
-    {reply, get_ledger_state_message(State), State#ledger_state{clients = NewClients}};
+    NewState = State#ledger_state{clients = NewClients},
+    cast_cursor_positions_to_client(get_cursor_positions_for_head_id_map(NewState), HeadId, get_client_pid(From)),
+    {reply, get_ledger_state_message(NewState), NewState};
 handle_call(get_state, _From, State) ->
     {reply, State, State};
 handle_call(_Request, _From, State) ->

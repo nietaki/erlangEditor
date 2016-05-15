@@ -39,6 +39,7 @@ server_registers_a_client(_Pid) ->
 server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
     fun() ->
         ledgerServer:register("Steve"),
+        test_utils:expect_cast_of_type(cursor_positions_at_head),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
         ?assertMatch(#ledger_state{head_id = 1, head_text = "x", clients= _Clients}, ledgerServer:debug_get_state()),
         test_utils:expect_cast({local_changes_accepted,0,1})
@@ -47,6 +48,7 @@ server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
 server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
     fun() ->
         ledgerServer:register("Steve"),
+        test_utils:expect_cast_of_type(cursor_positions_at_head),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}, {insert_char, 1, $y}]),
         ?assertMatch(#ledger_state{head_id=2, head_text="xy", clients=_Clients}, ledgerServer:debug_get_state()),
         test_utils:expect_cast({local_changes_accepted,0,2}) 
@@ -55,6 +57,7 @@ server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
 second_client_gets_updated_text(_Pid) ->
     fun() ->
         ledgerServer:register("Steve"),
+        test_utils:expect_cast_of_type(cursor_positions_at_head),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
         
         Proxy = server_proxy:start(ledgerServer),
@@ -71,8 +74,10 @@ clients_get_their_changes_on_text_update(_Pid) ->
         % Arrange
         Proxy = server_proxy:start(ledgerServer),
         server_proxy:run_fun(Proxy, fun() -> ledgerServer:register("John") end),
+        ?assertEqual(cursor_positions_at_head, element(1, server_proxy:receive_a_cast_message(Proxy))),
         
         ledgerServer:register("Steve"),
+        test_utils:expect_cast_of_type(cursor_positions_at_head),
         
         % Act
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
@@ -93,7 +98,9 @@ client_gets_ledger_changed_message_if_they_post_changes_with_old_head_id(_Pid) -
         server_proxy:run_fun(Proxy, fun() -> ledgerServer:register("John") end),
         
         ledgerServer:register("Steve"),
+        test_utils:expect_cast_of_type(cursor_positions_at_head),
         server_proxy:run_fun(Proxy, fun() -> ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]) end),
+        ?assertEqual(cursor_positions_at_head, element(1, server_proxy:receive_a_cast_message(Proxy))),
         ?assertMatch({local_changes_accepted,0,1}, server_proxy:receive_a_cast_message(Proxy)),
         
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $y}]),
