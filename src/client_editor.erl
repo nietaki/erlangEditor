@@ -128,11 +128,14 @@ debug_get_state(Pid) -> gen_server:call(Pid, get_state).
 handle_cast({ch, ?ceKEY_ESC}, State) -> 
     erlangEditor:stop(),
     {stop, user_pressed_esc, State};
-handle_cast({ch, Ch}, #client_state{local_state = LocalState, display_yx = YX} = State) ->
-    NewLocalState = handle_char(LocalState, YX, Ch),
-    EndState = State#client_state{local_state = NewLocalState},
+handle_cast({ch, Ch}, #client_state{display_yx = YX} = State) ->
+    EndState = handle_char(State, YX, Ch),
     repaint(EndState),
     submit_local_changes(EndState),
+    case is_movement_char(Ch) of
+        true -> submit_seen_head_and_cursor_position(EndState);
+        _ -> ok
+    end,   
     {noreply, EndState};
 handle_cast({local_changes_accepted, OldId, ChangeCount}, State) ->
     #client_state{ledger_head_state = LedgerHeadState, local_state = _LocalState} = State,
@@ -258,8 +261,8 @@ handle_ledger_change(ChangesSinceBaseHeadId, State) ->
     submit_local_changes(FinalState),
     FinalState.
 
--spec(handle_char(LocalState :: #local_state{}, YX :: {integer(), integer()}, Ch ::char()) -> #local_state{}).
-handle_char(LocalState, YX, Ch) ->
+handle_char(ClientState, YX, Ch) ->
+    LocalState = ClientState#client_state.local_state,
     CursorPosition = LocalState#local_state.cursor_position,
     NewLocalState = case Ch of
         Printable when Printable >= 20, Printable =< $~ -> insert_character(LocalState, Printable, CursorPosition);
@@ -270,12 +273,17 @@ handle_char(LocalState, YX, Ch) ->
         ?ceKEY_DEL -> delete_character(LocalState, CursorPosition);
         ?ceKEY_BACKSPACE -> delete_character(LocalState, CursorPosition - 1);
         ?ceKEY_BACKSPACE2-> delete_character(LocalState, CursorPosition - 1);
-        _ -> LocalState           
+        _ -> LocalState 
         %SomethingElse -> error(SomethingElse) 
     end,
-    EndState = fixup_state_position(NewLocalState),
-    EndState.
-  
+    ClientState#client_state{local_state = fixup_state_position(NewLocalState)}.
+
+is_movement_char(?ceKEY_DOWN) -> true;
+is_movement_char(?ceKEY_UP) -> true;
+is_movement_char(?ceKEY_LEFT) -> true;
+is_movement_char(?ceKEY_RIGHT) -> true;
+is_movement_char(_) -> false.
+
 fixup_state_position(#local_state{resulting_text = Text, cursor_position = Position}= LocalState) ->
     LocalState#local_state{resulting_text = Text, cursor_position = max(min(Position, string:len(Text)), 0)}.
 
@@ -288,14 +296,19 @@ insert_character(#local_state{resulting_text = Text, cursor_position = CurrentPo
         cursor_position = NewCursorPosition, 
         changes = [{insert_char, Position, Character}| Changes]}.
 
-delete_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition} = LocalState, PositionToDelete) ->
-    NewCursorPosition = if
-        PositionToDelete < CurrentPosition -> CurrentPosition - 1;
-        true -> CurrentPosition
-    end, 
-    LocalState#local_state{resulting_text = stringOps:delete_char(Text, PositionToDelete), 
-        cursor_position = NewCursorPosition,
-        changes = [{delete_char, PositionToDelete}]}.
+delete_character(#local_state{resulting_text = Text, cursor_position = CurrentPosition, changes = Changes} = LocalState, PositionToDelete) ->
+    if
+        PositionToDelete < 0 -> LocalState;
+        PositionToDelete >= length(Text) -> LocalState;
+        true ->
+            NewCursorPosition = if
+                PositionToDelete < CurrentPosition -> CurrentPosition - 1;
+                true -> CurrentPosition
+            end, 
+            LocalState#local_state{resulting_text = stringOps:delete_char(Text, PositionToDelete), 
+            cursor_position = NewCursorPosition,
+            changes = [{delete_char, PositionToDelete} | Changes]}
+    end.
 
 get_new_position(OriginalPosition, {ConsoleHeight, ConsoleWidth}, Direction) ->
     NewPosition = case Direction of
