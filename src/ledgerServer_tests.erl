@@ -41,8 +41,7 @@ server_registers_a_client_andGetsChangesSubmitted(_Pid) ->
         ledgerServer:register("Steve"),
         ledgerServer:submit_local_changes(self(), 0, [{insert_char, 0, $x}]),
         ?assertMatch(#ledger_state{head_id = 1, head_text = "x", clients= _Clients}, ledgerServer:debug_get_state()),
-        test_utils:expect_cast({local_changes_accepted,0,1}),
-        test_utils:expect_no_cast()
+        test_utils:expect_cast({local_changes_accepted,0,1})
     end.
 
 server_registers_a_client_andGetsTwoChangesSubmitted(_Pid) ->
@@ -80,7 +79,6 @@ clients_get_their_changes_on_text_update(_Pid) ->
         
         % Assert
         test_utils:expect_cast({local_changes_accepted,0,1}),
-        test_utils:expect_no_cast(),
         
         %?assertEqual({}, ledgerServer:debug_get_state()),
         ?assertMatch({ledger_changed, 0, [{insert_char, 0, $x}]}, server_proxy:receive_a_cast_message(Proxy)),

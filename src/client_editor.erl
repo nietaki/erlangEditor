@@ -159,6 +159,8 @@ handle_cast({ledger_changed, BaseHeadId, ChangesSinceBaseHeadId}, State) when Ba
 handle_cast({ledger_changed, _BaseHeadId, _ChangesSinceBaseHeadId} = Request, State) ->
     error({got_ledger_changed_message_for_a_wrong_base_head_id, Request}),
     {noreply, State};
+handle_cast({cursor_positions_at_head, PositionsMap, HeadId}, State) ->
+    {noreply, State};
 handle_cast(Request, State) ->
     error({unrecognized_cast, Request}),
     {noreply, State}.
@@ -226,7 +228,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 repaint(ClientState) ->
     #client_state{display_repaint_fun = RepaintFun, local_state = LocalState, cursor_positions = CursorPositions} = ClientState,
-    RepaintFun(LocalState, CursorPositions).
+    RepaintFun(LocalState, maps:keys(CursorPositions)).
 
 handle_ledger_change(ChangesSinceBaseHeadId, State) ->
     LocalState = State#client_state.local_state,

@@ -138,6 +138,7 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                             StateWithAppliedChanges1 = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
                             StateWithAppliedChanges = prune_change_history(StateWithAppliedChanges1),
                             cast_changes_to_all_clients_except_for(StateWithAppliedChanges, Sender),
+                            cast_cursor_positions_to_all_clients(StateWithAppliedChanges),
                             debug_msg("changes applied", []),
                             debug_msg("new state: ~p", [StateWithAppliedChanges]),
                             {noreply, StateWithAppliedChanges};
@@ -277,6 +278,16 @@ cast_changes_to_all_clients_except_for(State, ClientPid) ->
     ClientList = maps:keys(State#ledger_state.clients),
     ClientListFiltered = lists:filter(fun(C) -> C =/= ClientPid end, ClientList),
     lists:map(fun(C) -> cast_changes_to_client(State, C) end, ClientListFiltered).
+
+cast_cursor_positions_to_all_clients(#ledger_state{clients = Clients, head_id = HeadId}) ->
+    ClientsAtHead = maps:filter(fun (_, V) -> V#client_info.last_seen_head =:= HeadId end, Clients),
+    PidToTupleMap = maps:map(fun (_, #client_info{username = Username, cursor_position = CursorPosition}) -> {Username, CursorPosition} end, ClientsAtHead),
+    ClientPids = maps:keys(Clients),
+    lists:map(fun(C) -> cast_cursor_positions_to_client(PidToTupleMap, HeadId, C) end, ClientPids).
+
+% PositionsMap should be a map like #{ Pid -> {Username, CursorPosition} }, only for clients at head
+cast_cursor_positions_to_client(PositionsMap, HeadId, Client) -> 
+    gen_server:cast(Client, {cursor_positions_at_head, PositionsMap, HeadId}).
 
 cast_changes_to_client(State, ClientPid) ->
     gen_server:cast(ClientPid, get_changes_for_client(State, ClientPid)),

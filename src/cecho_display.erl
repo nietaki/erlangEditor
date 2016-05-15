@@ -35,7 +35,7 @@ getch_loop(ServerRef) ->
     getch_loop(ServerRef).
 
 %this will accept client_state initially, display_state later on
--spec(repaint(State :: #local_state{}, CursorPositions :: #{}) -> {ok, integer()}).
+-spec(repaint(State :: #local_state{}, CursorPositions :: [{string(), integer()}]) -> {ok, integer()}).
 repaint(#local_state{resulting_text = Text, cursor_position = Pos}, CursorPositions) -> 
     ok = cecho:erase(),
     ok = cecho:mvaddstr(0, 0, Text),
@@ -47,10 +47,11 @@ repaint(#local_state{resulting_text = Text, cursor_position = Pos}, CursorPositi
     ok = cecho:refresh(),
     ok.
 
+-spec(print_cursors(Cursors :: [{string(), integer()}]) -> ok).
 print_cursors(Cursors) ->
     YX = cecho:getmaxyx(),
     cecho:attron(?ceA_BOLD),
-    maps:map(fun(Name, Position) ->  
+    lists:map(fun({Name, Position}) ->  
         {Y, X} = get_yx_from_position(YX, Position),
         Char = hd(Name),
         cecho:mvaddch(Y, X, Char)
