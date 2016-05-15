@@ -88,7 +88,7 @@ init([]) ->
     {stop, Reason :: term(), NewState :: #ledger_state{}}).
 handle_call({register, Username}, From, State) ->
     #ledger_state{head_id = HeadId, clients = Clients} = State,
-    NewClientState = #client_info{username = Username, last_seen_head = HeadId},
+    NewClientState = #client_info{username = Username, last_seen_head = HeadId, cursor_position = length(State#ledger_state.head_text)},
     NewClients = Clients#{get_client_pid(From) => NewClientState},
     monitor(process, get_client_pid(From)),
     debug_msg("client ~s joined as pid ~p", [Username, From]),
@@ -248,7 +248,7 @@ prune_change_history(#ledger_state{head_id = HeadId, clients = Clients, changes 
     LedgerState#ledger_state{changes = NewChanges}.
 
 prune_change_history_test() ->
-    Clients = #{a => #client_info{last_seen_head = 3}, b => #client_info{last_seen_head = 4}},
+    Clients = #{a => #client_info{last_seen_head = 3}, b => #client_info{last_seen_head = 4}}, %HERE
     Changes = [{delete_char, 1}, {delete_char, 2}, {delete_char, 3}, {delete_char, 4}, {delete_char, 5}],
     State = #ledger_state{head_id = 7, head_text = "testtesttest", clients = Clients, changes = Changes},
     % HEAD_ID 0   1   3   4   5   6   7

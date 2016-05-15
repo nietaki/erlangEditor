@@ -30,11 +30,10 @@ server_is_alive(Pid) ->
 
 server_registers_a_client(_Pid) ->
     fun() ->
-        ?assertEqual(#ledger_head_state{head_id = 0, head_text = ""}, 
-        ledgerServer:register("Steve")),
+        ?assertEqual(#ledger_head_state{head_id = 0, head_text = ""}, ledgerServer:register("Steve")),
         #ledger_state{head_id = 0, head_text=[], clients=ClientsMap, changes=[]} = ledgerServer:debug_get_state(),
         ?assert(maps:is_key(self(), ClientsMap)),
-        ?assertEqual(#client_info{username = "Steve", last_seen_head = 0}, maps:get(self(), ClientsMap))
+        ?assertEqual(#client_info{username = "Steve", last_seen_head = 0, cursor_position = 0}, maps:get(self(), ClientsMap))
     end.
     
 server_registers_a_client_andGetsChangesSubmitted(_Pid) ->

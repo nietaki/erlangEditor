@@ -17,4 +17,8 @@
     head_text = ""
 }).
 
--record(client_info, {username, last_seen_head}).
+-record(client_info, {
+    username, 
+    last_seen_head,
+    cursor_position
+}).
