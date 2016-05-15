@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, register/1, submit_local_changes/3]).
+-export([start_link/0, register/1, submit_local_changes/3, confirm_seeing_head_revision/1]).
 
 %% debug API
 -export([debug_get_state/0]).
@@ -130,9 +130,7 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                             #ledger_state{head_id = OldId, changes = OldChanges, clients = ClientsMap} = State,
                             % updating Sender's last seen head_id
                             NewId = OldId + length(NewChanges),
-                            #{Sender := OldClientInfo} = ClientsMap,
-                            NewClientInfo = OldClientInfo#client_info{last_seen_head = NewId},
-                            NewClientsMap = ClientsMap#{Sender := NewClientInfo},
+                            NewClientsMap = update_clients_seen_head_id(ClientsMap, Sender, NewId),
                             
                             gen_server:cast(Sender, {local_changes_accepted, OldId, length(NewChanges)}),
                             StateWithAppliedChanges1 = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
@@ -161,11 +159,19 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
             debug_msg("can't apply changes based on head_id from the future: ~p~n", [Message]),
             error(received_head_id_too_new)
     end;
+handle_cast({ledger_seen, Who, HeadId}, #ledger_state{clients = ClientsMap} = State) ->
+    debug_msg("~p says they have seen ~p revision of changes", [Who, HeadId]),
+    NewClientsMap = update_clients_seen_head_id(ClientsMap, Who, HeadId),
+    debug_msg("the clients map is: ~p", [NewClientsMap]),
+    {noreply, prune_change_history(State#ledger_state{clients = NewClientsMap})};
 handle_cast(_Request, State) ->
     {noreply, State}.
 
 submit_local_changes(Pid, BaseHeadId, NewChanges) ->
     gen_server:cast(server_ref(), {submit_local_changes, Pid, BaseHeadId, NewChanges}).
+
+confirm_seeing_head_revision(HeadId) ->
+    gen_server:cast(server_ref(), {ledger_seen, self(), HeadId}).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -225,11 +231,20 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+update_clients_seen_head_id(ClientsMap, Client, HeadId) ->
+    #{Client := OldClientInfo} = ClientsMap,
+    NewClientInfo = OldClientInfo#client_info{last_seen_head = HeadId},
+    ClientsMap#{Client := NewClientInfo}.
+
 prune_change_history(#ledger_state{head_id = HeadId, clients = Clients, changes = Changes} = LedgerState) ->
     HeadIdsSeenByClients = lists:map(fun (ClientInfo) -> ClientInfo#client_info.last_seen_head end, maps:values(Clients)),
     SmallestClientHeadId = lists:foldl(fun min/2, HeadId, HeadIdsSeenByClients),
     HowManyToKeep = HeadId - SmallestClientHeadId,
     NewChanges = stringOps:get_last_elements(HowManyToKeep, Changes),
+    if
+        NewChanges =/= Changes -> debug_msg("pruned changes from ~p to ~p", [Changes, NewChanges]);
+        true -> ok
+    end,
     LedgerState#ledger_state{changes = NewChanges}.
 
 prune_change_history_test() ->

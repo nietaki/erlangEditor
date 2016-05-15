@@ -151,6 +151,7 @@ handle_cast({ledger_changed, BaseHeadId, ChangesSinceBaseHeadId}, State) when Ba
     {_DiscardedChanges, RelevantChanges} = lists:split(CountOfChangesToDrop, ChangesSinceBaseHeadId),
     FinalState = handle_ledger_change(RelevantChanges, State),
     repaint(FinalState),
+    ledgerServer:confirm_seeing_head_revision(FinalState#client_state.ledger_head_state#ledger_head_state.head_id),
     {noreply, FinalState};
 handle_cast({ledger_changed, _BaseHeadId, _ChangesSinceBaseHeadId} = Request, State) ->
     error({got_ledger_changed_message_for_a_wrong_base_head_id, Request}),
