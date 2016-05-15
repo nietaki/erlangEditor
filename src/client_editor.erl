@@ -152,7 +152,7 @@ handle_cast({ledger_changed, BaseHeadId, ChangesSinceBaseHeadId}, State) when Ba
     FinalState = handle_ledger_change(RelevantChanges, State),
     repaint(FinalState),
     case FinalState#client_state.local_state#local_state.changes of
-        [] -> ledgerServer:confirm_seeing_head_revision(FinalState#client_state.ledger_head_state#ledger_head_state.head_id, FinalState#client_state.local_state#local_state.cursor_position);
+        [] -> submit_seen_head_and_cursor_position(FinalState);
         _ -> ok % if there are some local changes, we will be submitting them anyways, notifying the server of both the seen head id and cursor position
     end,
     {noreply, FinalState};
@@ -233,6 +233,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+submit_seen_head_and_cursor_position(State) ->
+ledgerServer:submit_seen_head_revision_and_cursor_position(State#client_state.ledger_head_state#ledger_head_state.head_id, State#client_state.local_state#local_state.cursor_position).
+
 repaint(ClientState) ->
     #client_state{display_repaint_fun = RepaintFun, local_state = LocalState, cursor_positions = CursorPositions} = ClientState,
     CursorPositionsWithoutMine = maps:filter(fun (K, _) -> K =/= self() end, CursorPositions),
@@ -255,7 +258,7 @@ handle_ledger_change(ChangesSinceBaseHeadId, State) ->
     submit_local_changes(FinalState),
     FinalState.
 
--spec(handle_char(LocalState :: #local_state{}, YX :: {integer(), integer()}, Ch ::char()) -> #client_state{}).
+-spec(handle_char(LocalState :: #local_state{}, YX :: {integer(), integer()}, Ch ::char()) -> #local_state{}).
 handle_char(LocalState, YX, Ch) ->
     CursorPosition = LocalState#local_state.cursor_position,
     NewLocalState = case Ch of

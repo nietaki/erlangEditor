@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, register/1, submit_local_changes/3, confirm_seeing_head_revision/2]).
+-export([start_link/0, register/1, submit_local_changes/3, submit_seen_head_revision_and_cursor_position/2]).
 
 %% debug API
 -export([debug_get_state/0]).
@@ -135,7 +135,6 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                             NewId = OldId + length(NewChanges),
                             ClientsMap1 = update_clients_seen_head_id(ClientsMap, Sender, NewId),
                             NewClientsMap = update_clients_cursor_position(ClientsMap1, Sender, LastChangePosition), 
-                            %NewClientsMap = ClientsMap1,
                             gen_server:cast(Sender, {local_changes_accepted, OldId, length(NewChanges)}),
                             StateWithAppliedChanges1 = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
                             StateWithAppliedChanges = prune_change_history(StateWithAppliedChanges1),
@@ -165,20 +164,27 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
             error(received_head_id_too_new)
     end;
 handle_cast({ledger_seen, Who, HeadId, CursorPosition}, #ledger_state{clients = ClientsMap} = State) ->
-    debug_msg("~p says they have seen ~p revision of changes", [Who, HeadId]),
-    NewClientsMap1 = update_clients_seen_head_id(ClientsMap, Who, HeadId),
-    NewClientsMap = update_clients_cursor_position(NewClientsMap1, Who, CursorPosition),
-    debug_msg("the clients map is: ~p", [NewClientsMap]),
-    NewState = prune_change_history(State#ledger_state{clients = NewClientsMap}),
-    cast_cursor_positions_to_all_clients(NewState),
-    {noreply, NewState};
+    ClientInfo = maps:get(Who, ClientsMap),
+    CurrentHeadId = ClientInfo#client_info.last_seen_head,
+    if
+        HeadId >= CurrentHeadId ->
+            debug_msg("~p says they have seen ~p revision of changes", [Who, HeadId]),
+            NewClientsMap1 = update_clients_seen_head_id(ClientsMap, Who, HeadId),
+            NewClientsMap = update_clients_cursor_position(NewClientsMap1, Who, CursorPosition),
+            debug_msg("the clients map is: ~p", [NewClientsMap]),
+            NewState = prune_change_history(State#ledger_state{clients = NewClientsMap}),
+            cast_cursor_positions_to_all_clients(NewState),
+            {noreply, NewState};
+        true ->
+            {noreply, State}
+    end; 
 handle_cast(_Request, State) ->
     {noreply, State}.
 
 submit_local_changes(Pid, BaseHeadId, NewChanges) ->
     gen_server:cast(server_ref(), {submit_local_changes, Pid, BaseHeadId, NewChanges}).
 
-confirm_seeing_head_revision(HeadId, CursorPosition) ->
+submit_seen_head_revision_and_cursor_position(HeadId, CursorPosition) ->
     gen_server:cast(server_ref(), {ledger_seen, self(), HeadId, CursorPosition}).
 
 %%--------------------------------------------------------------------
