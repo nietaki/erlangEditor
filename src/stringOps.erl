@@ -12,7 +12,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% API
--export([insert_char/3, delete_char/2, split/2, is_a_change/1, apply_change/2, apply_changes_verbose/2, apply_changes/2]).
+-export([insert_char/3, delete_char/2, split/2, is_a_change/1, change_position/1, apply_change/2, apply_changes_verbose/2, apply_changes/2]).
 -export([apply_change_to_position/2, apply_changes_to_position/2]).
 -export([rebase_changes/2]).
 -export([get_last_elements/2]).
@@ -79,6 +79,9 @@ is_printable(Char) -> is_integer(Char) and (Char >= 32) and (Char =< 126).
 is_a_change({delete_char, Pos}) when is_integer(Pos) -> true;
 is_a_change({insert_char, Pos, Char}) when is_integer(Pos), is_integer(Char), Char >= 32, Char =< 126 -> true;
 is_a_change(_) -> false.
+
+change_position({delete_char, Pos}) -> Pos;
+change_position({insert_char, Pos, _Char}) -> Pos.
 
 apply_change({delete_char, Pos}, Text) ->
     PosIsCorrect = (Pos >= 0) and (Pos < string:len(Text)),
