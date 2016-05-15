@@ -14,7 +14,7 @@
 -include("client_editor.hrl").
 
 %% API
--export([initialize/1, repaint/1]).
+-export([initialize/1, repaint/2]).
 
 -export([getch_loop/1]).
 
@@ -22,6 +22,7 @@ initialize(ServerRef) ->
     % start cecho
     ok = cecho:cbreak(),
     ok = cecho:noecho(),
+    % colors
     ok = cecho:keypad(?ceSTDSCR, true),
     ok = cecho:curs_set(?ceCURS_NORMAL),
     YX = cecho:getmaxyx(),
@@ -34,16 +35,27 @@ getch_loop(ServerRef) ->
     getch_loop(ServerRef).
 
 %this will accept client_state initially, display_state later on
--spec(repaint(State :: #local_state{}) -> {ok, integer()}).
-repaint(#local_state{resulting_text = Text, cursor_position = Pos}) -> 
+-spec(repaint(State :: #local_state{}, CursorPositions :: #{}) -> {ok, integer()}).
+repaint(#local_state{resulting_text = Text, cursor_position = Pos}, CursorPositions) -> 
     ok = cecho:erase(),
     ok = cecho:mvaddstr(0, 0, Text),
     {_Height, Width} = cecho:getmaxyx(),
     ok = render_lines(0, split_into_lines(Width, Text)),
+    print_cursors(CursorPositions),
     {Y, X} = get_yx_from_position(cecho:getmaxyx(), Pos),
     ok = cecho:move(Y, X),
     ok = cecho:refresh(),
     ok.
+
+print_cursors(Cursors) ->
+    YX = cecho:getmaxyx(),
+    cecho:attron(?ceA_BOLD),
+    maps:map(fun(Name, Position) ->  
+        {Y, X} = get_yx_from_position(YX, Position),
+        Char = hd(Name),
+        cecho:mvaddch(Y, X, Char)
+             end, Cursors),
+    cecho:attroff(?ceA_BOLD).
 
 render_lines(_StartingLineNumber, []) -> ok;
 render_lines(StartingLineNumber, [H|T]) ->

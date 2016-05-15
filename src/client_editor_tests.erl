@@ -173,7 +173,7 @@ changes_of_two_clients_get_merged_no_waiting(_ServerPid) ->
 spawn_client() -> spawn_client(client_editor).
 
 spawn_client(ArbitraryName) ->
-    {ok, ClientPid} = client_editor:start_link(fun initializeNop/1, fun repaintNop/1, ArbitraryName),
+    {ok, ClientPid} = client_editor:start_link(fun initializeNop/1, fun repaintNop/2, ArbitraryName),
     ClientPid.
 
 kill_client(Pid) ->
@@ -181,7 +181,7 @@ kill_client(Pid) ->
     exit(Pid, kill). %% brutal kill!
 
 initializeNop(_) -> {ok, {10, 10}}.
-repaintNop(_) -> ok.
+repaintNop(_, _) -> ok.
 
 setup() ->
     %?debugMsg("setup"),

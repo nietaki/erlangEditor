@@ -45,7 +45,7 @@
 -spec(start_link() ->
     {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
-    start_link(fun cecho_display:initialize/1, fun cecho_display:repaint/1).
+    start_link(fun cecho_display:initialize/1, fun cecho_display:repaint/2).
 
 start_link(InitFun, RepaintFun) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [InitFun, RepaintFun], []).
@@ -222,8 +222,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 repaint(ClientState) ->
-    RepaintFun = ClientState#client_state.display_repaint_fun,
-    RepaintFun(ClientState#client_state.local_state).
+    #client_state{display_repaint_fun = RepaintFun, local_state = LocalState, cursor_positions = CursorPositions} = ClientState,
+    RepaintFun(LocalState, CursorPositions).
 
 handle_ledger_change(ChangesSinceBaseHeadId, State) ->
     LocalState = State#client_state.local_state,
