@@ -206,6 +206,7 @@ handle_info({'DOWN', _Ref, process, Pid, _Why} = MonitorMessage, State) ->
     NewClients = maps:remove(Pid, State#ledger_state.clients),
     NewState = State#ledger_state{clients = NewClients},
     debug_msg("new state: ~p", [NewState]),
+    cast_to_all_connected_clients(NewState, {client_disconnected, Pid}),
     {noreply, NewState};
 handle_info(Info, State) ->
     debug_msg("info: ~p", [Info]),
@@ -282,6 +283,9 @@ get_ledger_state_message(#ledger_state{head_id = HeadId, head_text = Text}) ->
     #ledger_head_state{head_id = HeadId, head_text = Text}.
 
 get_client_pid({ClientPid, _Tag}) -> ClientPid.
+
+cast_to_all_connected_clients(#ledger_state{clients = Clients}, Message) ->
+    lists:map(fun(Client) -> gen_server:cast(Client, Message) end, maps:keys(Clients)).
 
 % yes, the casting changes to clients could be optimised by using the map more directly
 cast_changes_to_all_clients_except_for(State, ClientPid) ->

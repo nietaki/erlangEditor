@@ -171,6 +171,11 @@ handle_cast({cursor_positions_at_head, PositionsMap, HeadId}, #client_state{curs
             {noreply, NewState};
         true -> {noreply, State}
     end;
+handle_cast({client_disconnected, Pid}, #client_state{cursor_positions = CursorPositions} = State) ->
+    CursorPositionsWithoutDisconnectedClient = maps:without([Pid], CursorPositions),
+    NewState = State#client_state{cursor_positions = CursorPositionsWithoutDisconnectedClient},
+    repaint(NewState),
+    {noreply, NewState};
 handle_cast(Request, State) ->
     error({unrecognized_cast, Request}),
     {noreply, State}.
