@@ -30,6 +30,9 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("ledgerServer.hrl").
 
+% quick hack: use this to toggle the debug messages in the server console
+console_debug_messages_enabled() -> false.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -333,5 +336,9 @@ get_changes_since_test_() ->
     ].
 
 debug_msg(Format, Arguments) ->
-    io:format(Format, Arguments),
-    io:nl().
+    case console_debug_messages_enabled() of
+        false -> ok;
+        true ->
+            io:format(Format, Arguments),
+            io:nl()
+    end.

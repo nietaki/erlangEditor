@@ -10,22 +10,31 @@
 -author("nietaki").
 
 %% API
--export([run/1, move_around/1]).
-
+-export([run/2, give_random_movement_command/1, spawn_server/0]).
 
 % for now server should be running already when this is called
-run(ClientCount) -> 
-    %spawn_server(),
+run(ClientCount, ClientActionsPerSecond) ->
+    % validating arguments 
+    if
+        (ClientCount < 1) or (ClientCount > 1000000) ->
+            error(please_specify_correct_client__count);
+        (ClientActionsPerSecond < 1) or (ClientActionsPerSecond > 1000) ->
+            error(please_specify_correct_client_actions_per_second_count);
+        true -> ok
+    end,
+    
+    Interval = ClientActionsPerSecond div ClientActionsPerSecond,
     FirstClient = spawn_client(first_client),
-   
+    
     %getting some initial text
     perform_x_times(100, fun (_) -> client_editor:send_char(FirstClient, $x) end),
+    timer:sleep(10),
   
     %spawning the chatty clients
     perform_x_times(ClientCount, fun(No) -> spawn_client_number(No) end),
     timer:sleep(500),
 
-    perform_x_times(ClientCount, fun(No) -> make_chatty(No) end),
+    perform_x_times(ClientCount, fun(No) -> make_chatty(No, Interval) end),
     
     %cleanup
     kill_process(FirstClient),
@@ -33,16 +42,12 @@ run(ClientCount) ->
 
 spawn_client_number(Number) -> 
     Name = get_atom_for_integer(Number),
-    ClientPid = spawn_client(Name),
+    _ClientPid = spawn_client(Name),
     ok.
 
-make_chatty(Number) ->
+make_chatty(Number, IntervalInMilliseconds) ->
     Name = get_atom_for_integer(Number),
-    spawn_link(benchmark, move_around, [Name]). 
-
-move_around(ClientPid) ->
-    give_random_movement_command(ClientPid),
-    move_around(ClientPid).
+    {ok, _TRef} = timer:apply_interval(IntervalInMilliseconds, benchmark, give_random_movement_command, [Name]).
 
 give_random_movement_command(ClientPid) ->
     Directions = [up, down, left, right],
