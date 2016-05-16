@@ -23,3 +23,5 @@ test_connecting_to_server() ->
     io:format("~w~n", [nodes()]),
     io:format("~w~n", [ledgerServer:debug_get_state()]),
     ok.
+
+

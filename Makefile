@@ -31,7 +31,7 @@ client3: all
 shell: all
 	erl -pa ./ebin -sname shell@localhost -setcookie pass -s cluster_utils join_server_cluster
 
-observer: all
+obs: all
 	erl -pa ./ebin -sname observer@localhost -setcookie pass -s observer start
 
 
