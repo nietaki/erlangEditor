@@ -3,6 +3,8 @@ Under OSX or Linux install erlang and rebar. Open 4 console windows and run `mak
 
 You can do your typing in the clients and read the debug messages in the server.
 
+You can also run `make test` to test the project
+
 ## How to run the benchmark?
 In one console window run `make server` and leave it be.
 
