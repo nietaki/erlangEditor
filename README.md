@@ -5,6 +5,11 @@ You can do your typing in the clients and read the debug messages in the server.
 
 You can also run `make test` to test the project
 
+### Testing concurrent changes
+It is difficult to see how the code works with concurrent changes when you run it on a single machine. But you can (sort of) using iTerm 2. Open a terminal window, split it (Shell -> split vertically), and launch a client in each. Then, right-click each of the window splits and from the context menu choose `Toggle Broadcasting Input`. You can now type to both clients at the same time!
+
+Thanks to @fala for pointing this out to me!
+
 ## How to run the benchmark?
 In one console window run `make server` and leave it be.
 
