@@ -11,9 +11,9 @@ It is difficult to see how the code works with concurrent changes when you run i
 Thanks to [@fala](https://github.com/fala) for pointing this out to me!
 
 ## Performance tuning
-Using utils:apply_throttled/3 it is possible to limit the amount of times a certain action is performed over a certain period of time, without ruining the consistency. Currently both the client and the server use it: client for limiting the rate of the cursor locations it itself sends out, and the server to limit the rate at which it broadcasts the cursor location updates to all of the clients. 
+Using `utils:apply_throttled/3` it is possible to limit the amount of times a certain action is performed over a certain period of time, without ruining the consistency. Currently both the client and the server use it: client for limiting the rate of the cursor locations it itself sends out, and the server to limit the rate at which it broadcasts the cursor location updates to all of the clients. 
 
-You can play around with the throttling configs by modifying ledger_server:cursor_position_broadcast_throttling_config/0 and client_editor:cursor_position_throttling_config/0. I think a good config for the client is to allow for short bursts of intense moving around and for the server to consistently keep the cursor update low(ish).
+You can play around with the throttling configs by modifying `ledger_server:cursor_position_broadcast_throttling_config/0` and `client_editor:cursor_position_throttling_config/0`. I think a good config for the client is to allow for short bursts of intense moving around and for the server to consistently keep the cursor update low(ish).
 
 ## How to run the benchmark?
 In one console window run `make server` and leave it be.
