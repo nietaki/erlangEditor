@@ -18,7 +18,7 @@ You can play around with the throttling configs by modifying `ledger_server:curs
 ## How to run the benchmark?
 In one console window run `make server` and leave it be.
 
-In another console window run `make obs` to launch the observer/appmon. In the `Nodes` dropdown menu choose `server@localhost` and switch to the `Processes` tab. The thing you're looking for is the length of the `MsgQ` for `ledgerServer`. If it goes up beyond a very small integer (say 10), it means the configuration of benchmark proved too much for it - the server can't process the messages at the rate they're coming in.
+In another console window run `make obs` to launch the observer/appmon. In the `Nodes` dropdown menu choose `server@localhost` and switch to the `Processes` tab. The thing you're looking for is the length of the `MsgQ` for `ledgerServer`. If it ~~goes up beyond a very small integer (say 10)~~ goes up beyond the client count and keeps growing, it means the configuration of benchmark proved too much for it - the server can't process the messages at the rate they're coming in.
 
 In yet another console window run `make shell` to launch the erlang shell. In the erlang shell run `benchmark:run(ClientCount, ClientMovementsPerSecond)`, for example `benchmark:run(5, 10)` will mean launching 5 clients, each experiencing 10 location updates per second, caused by the user.
 
