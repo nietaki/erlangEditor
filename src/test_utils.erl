@@ -10,8 +10,8 @@
 -author("nietaki").
 
 %% API
--export([expect_cast/1, expect_no_cast/0, expect_cast_of_type/1, expect_ping_message/0]).
--export([send_ping_to/1, send_ping_to_current_process/0, expect_no_ping_message/0]).
+-export([expect_cast/1, expect_no_cast/0, expect_cast_of_type/1]).
+-export([send_ping_to_current_process/0, expect_no_ping_message/0, expect_ping_message/0, expect_no_message/1, expect_message/1, send_to/2, send_to_current_process/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -38,21 +38,25 @@ expect_no_cast() ->
         ?assert(true)
     end.
 
-send_ping_to_current_process() -> send_ping_to(self()).
+send_ping_to_current_process() -> send_to_current_process(ping).
+expect_no_ping_message() -> expect_no_message(ping).
+expect_ping_message() -> expect_message(ping).
 
-send_ping_to(Pid) -> 
-    fun() -> Pid ! ping end.
+send_to_current_process(Msg) -> send_to(Msg, self()).
 
-expect_no_ping_message() ->
+send_to(Msg, Pid) -> 
+    fun() -> Pid ! Msg end.
+
+expect_no_message(Msg) ->
     receive
-        ping -> ?assert(ping_message_received)
+        Msg -> erlang:error({message_received, Msg})
     after 10 ->
         ?assert(true)
     end.
 
-expect_ping_message() ->
+expect_message(Msg) ->
     receive
-        ping -> ?assert(true)
+        Msg-> ?assert(true)
     after 10 ->
-        ?assert(ping_message_not_received)
+        erlang:error({message_not_received, Msg})
     end.
