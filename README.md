@@ -22,7 +22,7 @@ In another console window run `make obs` to launch the observer/appmon. In the `
 
 In yet another console window run `make shell` to launch the erlang shell. In the erlang shell run `benchmark:run(ClientCount, ClientMovementsPerSecond)`, for example `benchmark:run(5, 10)` will mean launching 5 clients, each experiencing 10 location updates per second, caused by the user.
 
-Please note: having the console debug messages on (`ledgerServer:console_debug_messsages_enabled()`) heavily impacts the performance.
+Please note: having the console debug messages on (`ledgerServer:console_debug_messsages_enabled()`) might impact the performance.
 
 ### Problems with the benchmark
 1. The clients and the server run on the same machine and cannibalize each other's resources. If the clients were remote, the results could have been different/more impressive.
