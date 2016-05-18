@@ -11,7 +11,12 @@
 -include("utils.hrl").
 
 % clients is a map of Pid to client_info record
--record(ledger_state, {head_id = 0, head_text = "", clients = #{}, changes = []}).
+-record(ledger_state, {head_id = 0, 
+    head_text = "", 
+    clients = #{}, 
+    changes = [], 
+    cursor_position_throttling_state = #throttling_state{}
+}).
 
 % sent to the clients
 -record(ledger_head_state, {

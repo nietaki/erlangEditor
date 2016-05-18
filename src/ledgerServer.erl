@@ -142,10 +142,10 @@ handle_cast({submit_local_changes, Sender, BaseHeadId, NewChanges}=Message, Stat
                             StateWithAppliedChanges1 = State#ledger_state{head_id = NewId, clients = NewClientsMap, head_text = NewText, changes = OldChanges ++ NewChanges},
                             StateWithAppliedChanges = prune_change_history(StateWithAppliedChanges1),
                             cast_changes_to_all_clients_except_for(StateWithAppliedChanges, Sender),
-                            cast_cursor_positions_to_all_clients(StateWithAppliedChanges),
+                            StateWithThrottlingChanges = cast_cursor_positions_to_all_clients(StateWithAppliedChanges),
                             debug_msg("changes applied", []),
-                            debug_msg("new state: ~p", [StateWithAppliedChanges]),
-                            {noreply, StateWithAppliedChanges};
+                            debug_msg("new state: ~p", [StateWithThrottlingChanges]),
+                            {noreply, StateWithThrottlingChanges};
                         _ -> 
                             debug_msg("couldn't apply incorrect changes", []),
                             {noreply, State} 
@@ -176,8 +176,8 @@ handle_cast({ledger_seen, Who, HeadId, CursorPosition}, #ledger_state{clients = 
             NewClientsMap = update_clients_cursor_position(NewClientsMap1, Who, CursorPosition),
             debug_msg("the clients map is: ~p", [NewClientsMap]),
             NewState = prune_change_history(State#ledger_state{clients = NewClientsMap}),
-            cast_cursor_positions_to_all_clients(NewState),
-            {noreply, NewState};
+            StateWithThrottlingChanges = cast_cursor_positions_to_all_clients_throttled(NewState),
+            {noreply, StateWithThrottlingChanges};
         true ->
             {noreply, State}
     end; 
@@ -302,12 +302,19 @@ cast_changes_to_all_clients_except_for(State, ClientPid) ->
 get_cursor_positions_for_head_id_map(#ledger_state{clients = Clients, head_id = HeadId}) ->
     ClientsAtHead = maps:filter(fun (_, V) -> V#client_info.last_seen_head =:= HeadId end, Clients),
     maps:map(fun (_, #client_info{username = Username, cursor_position = CursorPosition}) -> {Username, CursorPosition} end, ClientsAtHead).
+
+cursor_position_broadcast_throttling_config() -> #throttling_config{max_execution_count = 2, time_window = 1000}.
+
+cast_cursor_positions_to_all_clients_throttled(#ledger_state{cursor_position_throttling_state = ThrottlingState} = State) ->
+    NewThrottlingState = utils:apply_throttled(fun () -> cast_cursor_positions_to_all_clients(State) end, cursor_position_broadcast_throttling_config(), ThrottlingState),
+    State#ledger_state{cursor_position_throttling_state = NewThrottlingState}.
     
 cast_cursor_positions_to_all_clients(#ledger_state{clients = Clients, head_id = HeadId} = State) ->
     PidToTupleMap = get_cursor_positions_for_head_id_map(State), 
     ClientPids = maps:keys(Clients),
     debug_msg("sending client positions: ~p to clients ~p", [PidToTupleMap, ClientPids]),
-    lists:map(fun(C) -> cast_cursor_positions_to_client(PidToTupleMap, HeadId, C) end, ClientPids).
+    lists:map(fun(C) -> cast_cursor_positions_to_client(PidToTupleMap, HeadId, C) end, ClientPids),
+    State.
 
 % PositionsMap should be a map like #{ Pid -> {Username, CursorPosition} }, only for clients at head
 cast_cursor_positions_to_client(PositionsMap, HeadId, Client) -> 

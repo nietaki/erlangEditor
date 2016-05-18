@@ -241,7 +241,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-cursor_position_throttling_config() -> #throttling_config{max_execution_count = 4, time_window = 2000}.
+cursor_position_throttling_config() -> #throttling_config{max_execution_count = 10, time_window = 10000}.
 
 -spec(submit_seen_head_and_cursor_position_throttled(#client_state{}) -> #client_state{}).
 submit_seen_head_and_cursor_position_throttled(#client_state{cursor_position_throttling_state = ThrottlingState} = State) -> 
