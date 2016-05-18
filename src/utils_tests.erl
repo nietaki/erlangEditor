@@ -37,7 +37,9 @@ triggering_the_throttled_function_more_times_than_the_max_execution_count_doesnt
     utils:apply_throttled(test_utils:send_to_current_process(3), test_throttling_config(), State3),
     test_utils:expect_message(1),
     test_utils:expect_message(2),
-    test_utils:expect_no_message(3).
+    test_utils:expect_no_message(3),
+    timer:sleep(time_window() + 10),
+    lib:flush_receive().
 
 the_queue_does_empty_up_after_enough_time_test() ->
     State2 = utils:apply_throttled(test_utils:send_to_current_process(1), test_throttling_config(), utils:empty_throttling_state()),
@@ -47,5 +49,26 @@ the_queue_does_empty_up_after_enough_time_test() ->
     test_utils:expect_message(1),
     test_utils:expect_message(2),
     test_utils:expect_message(3).
+
+after_the_window_time_is_passed_the_late_functions_get_executed_as_well_test() ->
+    State2 = utils:apply_throttled(test_utils:send_to_current_process(1), test_throttling_config(), utils:empty_throttling_state()),
+    State3 = utils:apply_throttled(test_utils:send_to_current_process(2), test_throttling_config(), State2),
+    utils:apply_throttled(test_utils:send_to_current_process(3), test_throttling_config(), State3),
+    test_utils:expect_message(1),
+    test_utils:expect_message(2),
+    test_utils:expect_no_message(3),
+    timer:sleep(time_window() + 10),
+    test_utils:expect_message(3).
+
+only_the_last_late_execution_gets_delayed_test() ->
+    State2 = utils:apply_throttled(test_utils:send_to_current_process(1), test_throttling_config(), utils:empty_throttling_state()),
+    State3 = utils:apply_throttled(test_utils:send_to_current_process(2), test_throttling_config(), State2),
+    State4 = utils:apply_throttled(test_utils:send_to_current_process(3), test_throttling_config(), State3),
+    utils:apply_throttled(test_utils:send_to_current_process(4), test_throttling_config(), State4),
+    test_utils:expect_message(1),
+    test_utils:expect_message(2),
+    timer:sleep(time_window() + 10),
+    test_utils:expect_no_message(3),
+    test_utils:expect_message(4).
 
 
