@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, register/1, submit_local_changes/3, submit_seen_head_revision_and_cursor_position/2]).
+-export([start_link/0, register/1, submit_local_changes/3, submit_seen_head_revision_and_cursor_position/2, submit_seen_head_revision_and_cursor_position/3]).
 
 %% debug API
 -export([debug_get_state/0]).
@@ -31,7 +31,7 @@
 -include_lib("ledgerServer.hrl").
 
 % quick hack: use this to toggle the debug messages in the server console
-console_debug_messages_enabled() -> false.
+console_debug_messages_enabled() -> true.
 
 %%%===================================================================
 %%% API
@@ -188,7 +188,10 @@ submit_local_changes(Pid, BaseHeadId, NewChanges) ->
     gen_server:cast(server_ref(), {submit_local_changes, Pid, BaseHeadId, NewChanges}).
 
 submit_seen_head_revision_and_cursor_position(HeadId, CursorPosition) ->
-    gen_server:cast(server_ref(), {ledger_seen, self(), HeadId, CursorPosition}).
+    submit_seen_head_revision_and_cursor_position(HeadId, CursorPosition, self()).
+
+submit_seen_head_revision_and_cursor_position(HeadId, CursorPosition, SourcePid) ->
+    gen_server:cast(server_ref(), {ledger_seen, SourcePid, HeadId, CursorPosition}).
 
 %%--------------------------------------------------------------------
 %% @private

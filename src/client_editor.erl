@@ -80,7 +80,7 @@ init([DisplayInitFun, DisplayRepaintFun]) ->
         #ledger_head_state{head_id = _HeadId, head_text = Text} = LedgerHeadState ->
             {ok, DisplayYX} = DisplayInitFun(self()),
             LocalState = #local_state{ cursor_position = length(Text), resulting_text = Text},
-            State = #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState, display_repaint_fun = DisplayRepaintFun, display_yx = DisplayYX},
+            State = #client_state{ledger_head_state = LedgerHeadState, local_state = LocalState, display_repaint_fun = DisplayRepaintFun, display_yx = DisplayYX, cursor_position_throttling_state = utils:empty_throttling_state()},
             repaint(State),
             {ok, State};
         SomethingElse ->
@@ -132,11 +132,11 @@ handle_cast({ch, Ch}, #client_state{display_yx = YX} = State) ->
     EndState = handle_char(State, YX, Ch),
     repaint(EndState),
     submit_local_changes(EndState),
-    case is_movement_char(Ch) of
-        true -> submit_seen_head_and_cursor_position(EndState);
-        _ -> ok
+    EndStateWithThrottlingChanges = case is_movement_char(Ch) of
+        true -> submit_seen_head_and_cursor_position_throttled(EndState);
+        _ -> EndState 
     end,   
-    {noreply, EndState};
+    {noreply, EndStateWithThrottlingChanges};
 handle_cast({local_changes_accepted, OldId, ChangeCount}, State) ->
     #client_state{ledger_head_state = LedgerHeadState, local_state = _LocalState} = State,
     LastSeenLedgerHead = LedgerHeadState#ledger_head_state.head_id, 
@@ -241,8 +241,19 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+cursor_position_throttling_config() -> #throttling_config{max_execution_count = 4, time_window = 2000}.
+
+-spec(submit_seen_head_and_cursor_position_throttled(#client_state{}) -> #client_state{}).
+submit_seen_head_and_cursor_position_throttled(#client_state{cursor_position_throttling_state = ThrottlingState} = State) -> 
+    Self = self(),
+    NewThrottlingState = utils:apply_throttled(fun () -> submit_seen_head_and_cursor_position(State, Self) end, cursor_position_throttling_config(), ThrottlingState),
+    State#client_state{cursor_position_throttling_state = NewThrottlingState}.
+
 submit_seen_head_and_cursor_position(State) ->
-ledgerServer:submit_seen_head_revision_and_cursor_position(State#client_state.ledger_head_state#ledger_head_state.head_id, State#client_state.local_state#local_state.cursor_position).
+    submit_seen_head_and_cursor_position(State, self()).
+
+submit_seen_head_and_cursor_position(State, ClientPid) ->
+ledgerServer:submit_seen_head_revision_and_cursor_position(State#client_state.ledger_head_state#ledger_head_state.head_id, State#client_state.local_state#local_state.cursor_position, ClientPid).
 
 repaint(ClientState) ->
     #client_state{display_repaint_fun = RepaintFun, local_state = LocalState, cursor_positions = CursorPositions} = ClientState,

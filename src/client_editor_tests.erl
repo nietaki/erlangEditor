@@ -42,6 +42,7 @@ client_sends_a_letter_to_the_server_and_gets_its_changes_accepted(_ServerPid) ->
         client_editor:send_char(ClientPid, $q),
         timer:sleep(10),
         ClientState = client_editor:debug_get_state(ClientPid), 
+        %?assertMatch({}, ClientState),
         ?assertMatch(#ledger_state{head_id = 1, head_text = "q"}, ledgerServer:debug_get_state()),
         
         % client's changes should already be accepted

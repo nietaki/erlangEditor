@@ -21,4 +21,5 @@ Please note: having the console debug messages on (`ledgerServer:console_debug_m
 
 ### Problems with the benchmark
 1. The clients and the server run on the same machine and cannibalize each other's resources. If the clients were remote, the results could have been different/more impressive.
-1. %TODO
+1. The simulated clients are "synchronized" - when they get throttled, they all get throttled at the same time and for the same period of time. This leads to fluctuations of no client activity followed by activity of all the clients at the same time.
+1. It is possible to run the clients with input rate that is higher than they can process, which isn't an accurate representation of a real-life scenario

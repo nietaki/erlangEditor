@@ -22,6 +22,8 @@
     cursor_positions = #{},
     %display stuff
     display_repaint_fun,
-    display_yx
+    display_yx,
+    %throttling stuff
+    cursor_position_throttling_state = #throttling_state{}
 }).
 

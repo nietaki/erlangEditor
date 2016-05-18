@@ -8,6 +8,8 @@
 %%%-------------------------------------------------------------------
 -author("nietaki").
 
+-include("utils.hrl").
+
 % clients is a map of Pid to client_info record
 -record(ledger_state, {head_id = 0, head_text = "", clients = #{}, changes = []}).
 
